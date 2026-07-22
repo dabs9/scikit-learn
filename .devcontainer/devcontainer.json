@@ -1,18 +1,10 @@
 {
-  // More info about Features: https://containers.dev/features
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
-  "features": {},
-
-  "onCreateCommand": ".devcontainer/setup.sh",
-  "postCreateCommand": "",
-
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "ms-python.python",
-        "ms-toolsai.jupyter"
-      ],
-      "settings": {}
-    }
+  // Overridden on this review-harness branch only: the upstream config uses
+  // base:ubuntu-24.04 (no python3), which the offload worker's agent wrapper
+  // rejects. The harness needs python3 + git + node (for the claude CLI); it
+  // does not build scikit-learn, so the mamba setup.sh is intentionally not run.
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {}
   }
 }
