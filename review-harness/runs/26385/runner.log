@@ -1,0 +1,28 @@
+[harness 23:02:11] stage 0: inputs
+manifest: /work/review-harness/runs/26385/DIFF_MANIFEST.md (19 files, +3297/-10)
+hunks: /work/.rh-worktrees/rh-wt-26385/hunks (19 diffs)
+[harness 23:02:11] stage 1: 6 independent draws
+[harness 23:12:20] lint violations (draw_6, revision 1)
+[harness 23:14:49] lint violations (draw_2, revision 1)
+[harness 23:17:25] lint violations (draw_3, revision 1)
+[harness 23:21:37] lint violations (draw_4, revision 1)
+[harness 23:22:40] stage 2: union merge
+[harness 23:29:02] merged findings: 27 (max single draw: 16)
+[harness 23:29:02] stage 3: depth (add-only strengthening)
+[harness 23:50:09] depth violations (try 1)
+[harness 23:53:41] depth findings: 41
+[harness 23:53:41] stage 4: rule closure sweep
+[harness 00:02:46] lint violations (closure, revision 1)
+[harness 00:03:19] stage 5: inverse conformance
+[harness 00:07:07] lint violations (inverse, revision 1)
+[harness 00:07:31] lint violations (inverse, revision 2)
+[harness 00:08:00] stage 6+7: synthesis + fidelity audit
+[harness 00:18:20] fidelity audit clean
+[harness 00:18:20] stage 8: deliver (local only)
+severity counts: {"high": 5, "medium": 11, "low": 25}
+deliverables:
+  /work/review-harness/runs/26385/report.md (92238 bytes)
+  /work/review-harness/runs/26385/findings.json (108772 bytes)
+  /work/review-harness/runs/26385/synthesis_ledger.json (3448 bytes)
+  /work/review-harness/runs/26385/timings.tsv (285 bytes)
+[harness 00:18:20] run complete: /work/review-harness/runs/26385

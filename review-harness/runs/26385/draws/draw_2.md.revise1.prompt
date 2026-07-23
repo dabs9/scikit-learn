@@ -1,0 +1,144 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+draw_2.md F8: scenario lacks trigger→consequence arrow
+draw_2.md F10: scenario lacks trigger→consequence arrow
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+Now writing final findings.
+
+### F1 — `n_jobs` default is 4, contradicts docstring and sklearn convention
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:658 — `__init__` signature has `n_jobs=4`, but the docstring at sklearn/cluster/_hdbscan/hdbscan.py:486-490 says `n_jobs : int, default=None` with the standard `None means 1 unless in a :obj:`joblib.parallel_backend` context` semantics.
+scenario: "User instantiates `HDBSCAN()` with defaults → estimator silently spawns 4 workers for pairwise-distance computation, ignoring the surrounding joblib backend and using more CPU than documented (also making repr show `n_jobs=4` in doctests)"
+contract: Change the `__init__` default to `n_jobs=None` so signature matches the docstring and the sklearn `n_jobs` convention.
+instances: single-instance
+
+### F2 — `test_hdbscan_precomputed_non_brute` is test theater
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:276-284 — the test parametrizes `tree` over `["kd", "ball"]` and constructs `HDBSCAN(metric="precomputed", algorithm=f"prims_{tree}tree")`, but `prims_kdtree`/`prims_balltree` are not in the `algorithm` `StrOptions` (sklearn/cluster/_hdbscan/hdbscan.py:629-638 restricts it to `{"auto", "brute", "kdtree", "balltree"}`). The `ValueError` matched by `pytest.raises(ValueError)` comes from `_validate_params` rejecting the invalid literal, not from the `"Sparse data matrices only support algorithm `brute`."`/precomputed-tree rejection at sklearn/cluster/_hdbscan/hdbscan.py:786-791. The docstring claims to test the latter.
+scenario: "Someone weakens the precomputed-tree rejection in `fit` → this test still passes because the parameter-validation `ValueError` is raised earlier, so the intended safety property is uncovered by the suite"
+contract: Update the test to use one of the valid `algorithm` values (`"kdtree"`/`"balltree"`) so the assertion is driven by the runtime check inside `fit`.
+instances: single-instance
+
+### F3 — Plot example claims scale-invariance but never scales `X`
+severity: medium
+evidence: examples/cluster/plot_hdbscan.py:106-110 — inside `for idx, scale in enumerate((1, 0.5, 3))` the body calls `hdb.fit(X)` and `plot(X, hdb.labels_, ...)` with the unscaled `X`, while the surrounding narrative at examples/cluster/plot_hdbscan.py:104-105 says "HDBSCAN is scale-invariant" and the parallel DBSCAN block at examples/cluster/plot_hdbscan.py:92-95 uses `X * scale`. Every panel receives identical data, so the rendered figure demonstrates nothing about scale invariance.
+scenario: "Reader looks at the auto-generated example expecting scaled inputs → sees three identical HDBSCAN plots labelled `scale=1`, `scale=0.5`, `scale=3`, which is trivially self-consistent and does not evidence the property being taught"
+contract: Change the loop body to `hdb.fit(X * scale)` and `plot(X * scale, hdb.labels_, ...)`, mirroring the DBSCAN block.
+instances: single-instance
+
+### F4 — `_weighted_cluster_center` indexes reduced `X` with raw-sized `labels_`
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:830-855 — when `metric != "precomputed"` and the input contained non-finite rows, `X` is the finite-only slice (line 733) while `self.labels_` is re-expanded to `self._raw_data.shape[0]` (line 840-844). Then sklearn/cluster/_hdbscan/hdbscan.py:855 calls `self._weighted_cluster_center(X)` (still the reduced `X`), and the helper at sklearn/cluster/_hdbscan/hdbscan.py:907-909 computes `mask = self.labels_ == idx` (raw length) and evaluates `X[mask]`. Because `mask` is longer than `X`, boolean indexing raises `IndexError`. No test exercises `store_centers` together with non-finite data (see sklearn/cluster/tests/test_hdbscan.py:309-327 — both `test_hdbscan_centers` fixtures are fully finite), so the failure is silent until a user combines the two.
+scenario: "User fits `HDBSCAN(store_centers='centroid')` on data containing `np.nan`/`np.inf` rows → fit raises `IndexError: boolean index did not match indexed array along dimension 0`"
+contract: Pass the raw feature matrix (or use `finite_index` to align `labels_[finite_index]` back to `X`) into `_weighted_cluster_center`, and drop `-3` from the "non-noise" set (see F5).
+instances: single-instance
+
+### F5 — `_weighted_cluster_center` counts `-3` as a cluster
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:895 — `n_clusters = len(set(self.labels_) - {-1, -2})`. Missing samples use label `-3` per `_OUTLIER_ENCODING` (sklearn/cluster/_hdbscan/hdbscan.py:73-79), which is excluded from cluster counting elsewhere. Here `-3` is *not* subtracted, so when missing rows exist the count is inflated by one; the loop at sklearn/cluster/_hdbscan/hdbscan.py:907-920 then iterates one extra idx whose `mask = labels_ == idx` matches no rows, leaving one uninitialized-`np.empty` slot in `self.centroids_`/`self.medoids_` (or, once F4 is fixed, taking `np.average` of an empty slice and raising a warning).
+scenario: "User fits with `store_centers='centroid'` on data with `np.nan` rows → `self.centroids_` gains a bogus final row of garbage floats (or a `ZeroDivisionError` from `np.average` on an empty slice, depending on Python/NumPy version)"
+contract: Compute `n_clusters = len(set(self.labels_) - {-1, -2, -3})` (or subtract the full `_OUTLIER_ENCODING` labels plus `-1`) so outlier codes never leak into cluster counts.
+instances: single-instance
+
+### F6 — `test_dbscan_clustering_outlier_data` mis-computes `clean_idx`
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:206-215 — `missing_labels_idx` and `infinite_labels_idx` come from `np.flatnonzero(...)` and are `ndarray`s. Line 212 does `set(missing_labels_idx + infinite_labels_idx)`, which is elementwise numpy addition with broadcasting (`[2,5] + [0] → array([2, 5])`), NOT concatenation. So `clean_idx` retains sample 0 (the `+inf` row), and `X_outlier[clean_idx]` still contains a non-finite row while pretending to be the "clean" reference. The equality assertion happens to survive because HDBSCAN maps `+inf` to `-2` in both models, but the test does not test what it claims.
+scenario: "Someone changes handling of `+inf`-only rows → this test still passes because the reference model is also fed the non-finite row and processes it symmetrically, hiding the regression"
+contract: Concatenate the index arrays explicitly, e.g. `set(np.concatenate([missing_labels_idx, infinite_labels_idx]))` (or `set(missing_labels_idx.tolist() + infinite_labels_idx.tolist())`).
+instances: single-instance
+
+### F7 — `_hdbscan_brute` forwards `metric_params` to `pairwise_distances` including `max_distance`
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:238-243 — the non-precomputed branch calls `pairwise_distances(X, metric=metric, n_jobs=n_jobs, **metric_params)` and only afterwards extracts `max_distance = metric_params.get("max_distance", 0.0)`. `pairwise_distances` does not accept a `max_distance` keyword, so any user who sets `metric_params={"max_distance": ...}` with a non-precomputed metric gets `TypeError: ... got an unexpected keyword argument 'max_distance'`. The docstring at sklearn/cluster/_hdbscan/hdbscan.py:459-460 advertises `metric_params : dict` as generic "Arguments passed to the distance metric" without excluding this key.
+scenario: "User sets `metric_params={'max_distance': 5.0}` (documented for sparse precomputed) but with `metric='euclidean'` on a dense array → `pairwise_distances` rejects the kwarg and raises TypeError instead of quietly ignoring it"
+contract: Pop `max_distance` out of `metric_params` before forwarding to `pairwise_distances`, and treat it as a top-level runtime option.
+instances: single-instance
+
+### F8 — `_compute_stability` allocates `births` twice
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:252-254 — two consecutive `births = np.full(largest_child + 1, np.nan, dtype=np.float64)` statements. The first allocation is immediately discarded.
+scenario: "Not a correctness bug, but a wasted allocation on every fit; suggests a merge/rebase leftover"
+contract: Delete the duplicate assignment so only one `np.full` remains.
+instances: single-instance
+
+### F9 — `_hdbscan_brute` documents `alpha` default `1.0` but signature default is `None`
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:158-166 — signature reads `alpha=None`, while the docstring at sklearn/cluster/_hdbscan/hdbscan.py:183-184 says `alpha : float, default=1.0`. sklearn/cluster/_hdbscan/hdbscan.py:241 then does `distance_matrix /= alpha`, which would raise `TypeError: unsupported operand type(s) for /=: 'ndarray' and 'NoneType'` if the default were ever used. Only the internal call sites currently pass `self.alpha`, so it does not blow up in practice, but the signature is misleading.
+scenario: "External caller invokes `_hdbscan_brute(X)` (private but importable) → immediate TypeError; or someone future-refactors to omit `alpha` at a call site and hits the same crash"
+contract: Set the signature default to `alpha=1.0` so it matches the docstring and is safe when omitted.
+instances: single-instance
+
+### F10 — `whats_new` reference to `DBSCAN` missing module prefix
+severity: low
+evidence: doc/whats_new/v1.3.rst:194-196 — reads `Similarly to :class:`cluster.OPTICS`, it can be seen as a generalization of :class:`DBSCAN` by allowing for hierarchical instead of flat clustering`. The `:class:` role on `DBSCAN` omits the `cluster.` module prefix used everywhere else in the paragraph (and used for `cluster.HDBSCAN`, `cluster.OPTICS`), so Sphinx cannot resolve the cross-reference.
+scenario: "Doc build for 1.3 whats-new emits an unresolved-reference warning and renders `DBSCAN` as unlinked literal text instead of a link to the DBSCAN class"
+contract: Change to `:class:`cluster.DBSCAN`` to match the sibling references.
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record. You are one of several mutually-blind reviewers; do not assume anyone else
+will catch what you skip. Your final response text IS the deliverable file — output only
+the findings document described below.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /work/review-harness/runs/26385/PLAN.md
+- Diff manifest: /work/review-harness/runs/26385/DIFF_MANIFEST.md
+- Per-file hunk diffs: /work/.rh-worktrees/rh-wt-26385/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /work/.rh-worktrees/rh-wt-26385
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk EVERY changed file listed in the manifest: read its hunk diff, then open the full
+   file in the worktree and verify what the hunk implies — never trust the hunk alone.
+   `.pyx`/`.pxd` Cython files are first-class changed code; review them as carefully as `.py`.
+4. Review BOTH conformance directions:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Hunt the full failure spectrum: logic/correctness; security/authz/injection/secrets;
+   concurrency/async/error-paths; resource leaks; type-contract breaks; dead code and debug
+   leftovers; duplication; test weakening/theater (tests that assert constants or their own
+   literals); stale docs/comments; performance on hot paths; missing operational wiring.
+6. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+7. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+Number findings sequentially from F1. No preamble, no summary, no headings other than the
+finding blocks, no hedging ("consider possibly" is banned). If you genuinely verified there
+is nothing to report, output exactly: NO FINDINGS
