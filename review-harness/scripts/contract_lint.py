@@ -20,7 +20,7 @@ BLOCK_RE = re.compile(r"^### F(\d+)\b.*$", re.M)
 ANCHOR_RE = re.compile(r"[^\s\[\],`'\"]*[./][^\s\[\],`'\"]*:\d+(?:-\d+)?")
 SEVERITY_RE = re.compile(r"^severity:\s*(high|medium|low)\s*$", re.M)
 SCENARIO_RE = re.compile(r"^scenario:\s*\"(.+)\"\s*$", re.M)
-INSTANCES_RE = re.compile(r"^instances:\s*(single-instance\s*$|\[.*\]\s*$)", re.M)
+INSTANCES_LINE_RE = re.compile(r"^instances:\s*(.*)$", re.M)
 CONTRACT_RE = re.compile(r"^contract:\s*(\S.*)$", re.M)
 EVIDENCE_RE = re.compile(r"^evidence:\s*(\S.*)$", re.M)
 
@@ -96,11 +96,22 @@ def lint_text(text, label="findings"):
                 if pat.search(ct):
                     violations.append(f"{label} {fid}: hedged contract ({name}); pin ONE recommendation")
 
-        inst = INSTANCES_RE.search(block)
+        inst = INSTANCES_LINE_RE.search(block)
         if not inst:
-            violations.append(f"{label} {fid}: missing 'instances:' ([file:line,...] or single-instance)")
-        elif inst.group(1).strip() != "single-instance" and not ANCHOR_RE.search(inst.group(1)):
-            violations.append(f"{label} {fid}: instances list has no file:line anchors")
+            violations.append(f"{label} {fid}: missing 'instances:' line ([file:line,...] or single-instance)")
+        else:
+            val = inst.group(1).strip()
+            if val == "single-instance":
+                pass
+            elif val.startswith("[") and val.endswith("]"):
+                if not ANCHOR_RE.search(val):
+                    violations.append(f"{label} {fid}: instances list has no file:line anchors")
+            else:
+                violations.append(
+                    f"{label} {fid}: malformed instances value {val[:60]!r} — the line must be "
+                    "EXACTLY 'instances: single-instance' (no extra text after it) or "
+                    "'instances: [path/file.py:12, path/other.py:34]'"
+                )
 
     return violations
 
