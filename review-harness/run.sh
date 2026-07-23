@@ -19,7 +19,7 @@ LINT=$RH/scripts/contract_lint.py
 SNAP=$RH/scripts/snapshot_check.py
 AUDIT=$RH/scripts/fidelity_audit.py
 TIMINGS=$RUN/timings.tsv
-mkdir -p "$RUN" "$MARK" "$RUN/draws"
+mkdir -p "$RUN" "$MARK"
 
 note() { printf '[harness %s] %s\n' "$(date -u +%H:%M:%S)" "$*"; }
 die() { note "FATAL: $*"; exit 1; }
@@ -58,8 +58,8 @@ ensure_worktree() {
 }
 
 # ---------------------------------------------------------------- prompt templating
-render_prompt() { # render_prompt <template> <outfile>
-  python3 - "$1" "$2" <<PY
+render_prompt() { # render_prompt <template> <outfile> [KEY=VALUE ...]
+  python3 - "$1" "$2" "${@:3}" <<PY
 import sys
 from pathlib import Path
 text = Path(sys.argv[1]).read_text()
@@ -67,13 +67,20 @@ mapping = {
     "PLAN": "$RUN/PLAN.md", "MANIFEST": "$RUN/DIFF_MANIFEST.md",
     "HUNKS": "$WT/hunks", "WORKTREE": "$WT", "RUNDIR": "$RUN",
     "BASE_SHA": "$BASE_SHA", "HEAD_SHA": "$HEAD_SHA",
-    "PR_NUMBER": "$PR_NUMBER", "K": "$K_DRAWS",
+    "PR_NUMBER": "$PR_NUMBER",
 }
+for extra in sys.argv[3:]:
+    key, _, val = extra.partition("=")
+    mapping[key] = val
 for key, val in mapping.items():
     text = text.replace("{{%s}}" % key, val)
 Path(sys.argv[2]).write_text(text)
 PY
 }
+
+THEMES_TSV=$RH/prompts/themes.tsv
+theme_slugs() { cut -f1 "$THEMES_TSV"; }
+theme_charter() { awk -F'\t' -v s="$1" '$1==s{print $2}' "$THEMES_TSV"; }
 
 # ------------------------------------------------- draft -> lint -> revise loop
 lint_loop() { # lint_loop <findings_file> <base_prompt> <seat_name>
@@ -114,7 +121,15 @@ if ! done_marker stage0; then
   [[ -s "$RUN/PLAN.md" ]] || die "PLAN.md missing at $RUN/PLAN.md (must be committed with the harness)"
   python3 "$RH/scripts/diff_manifest.py" "$BASE_SHA" "$HEAD_SHA" --repo "$ROOT" \
     --manifest "$RUN/DIFF_MANIFEST.md" --hunks-dir "$WT/hunks" || die "diff_manifest failed"
-  for p in reviewer merge depth closure inverse synthesis; do
+  while IFS= read -r slug; do
+    [[ -n "$slug" ]] || continue
+    render_prompt "$RH/prompts/reviewer.md" "$RUN/reviewer.$slug.prompt.md" \
+      "THEME_SLUG=$slug" "THEME_CHARTER=$(theme_charter "$slug")"
+    render_prompt "$RH/prompts/merge.md" "$RUN/merge.$slug.prompt.md" \
+      "THEME_SLUG=$slug" \
+      "DRAW_A=$RUN/draws_a/$slug.md" "DRAW_B=$RUN/draws_b/$slug.md" "DRAW_C=$RUN/draws_c/$slug.md"
+  done < <(theme_slugs)
+  for p in depth closure inverse synthesis; do
     render_prompt "$RH/prompts/$p.md" "$RUN/$p.prompt.md"
   done
   t_end stage0_inputs; mark_done stage0
@@ -125,46 +140,64 @@ fi
 
 [[ "${STOP_AFTER:-}" == "stage0" ]] && { note "STOP_AFTER=stage0 — exiting after inputs"; exit 0; }
 
-# ================================================================ stage 1: draws
-if ! done_marker stage1; then
-  t_start; note "stage 1: $K_DRAWS independent draws"
-  pids=()
-  for i in $(seq 1 "$K_DRAWS"); do
-    run_seat_linted "draw_$i" "$RUN/reviewer.prompt.md" "$RUN/draws/draw_$i.md" &
-    pids+=($!)
-  done
-  fail=0
-  for p in "${pids[@]}"; do wait "$p" || fail=1; done
-  (( fail )) && die "stage 1: at least one draw seat failed (no silent partial results)"
-  t_end stage1_draws; mark_done stage1
-else note "skip stage 1 (marker)"; fi
+# ============================================== stage 1: three blind waves of 12 theme seats
+for wave in $DRAW_WAVES; do
+  if ! done_marker "stage1$wave"; then
+    t_start; note "stage 1$wave: 12 theme draws (wave $wave)"
+    mkdir -p "$RUN/draws_$wave"
+    pids=()
+    while IFS= read -r slug; do
+      [[ -n "$slug" ]] || continue
+      run_seat_linted "draw_${wave}_${slug}" "$RUN/reviewer.$slug.prompt.md" "$RUN/draws_$wave/$slug.md" &
+      pids+=($!)
+    done < <(theme_slugs)
+    fail=0
+    for p in "${pids[@]}"; do wait "$p" || fail=1; done
+    (( fail )) && die "stage 1$wave: at least one draw seat failed (no silent partial results)"
+    t_end "stage1${wave}_draws"; mark_done "stage1$wave"
+  else note "skip stage 1$wave (marker)"; fi
+done
 
-# ================================================================ stage 2: merge
-if ! done_marker stage2; then
-  t_start; note "stage 2: union merge"
-  max_draw=0
-  for f in "$RUN"/draws/draw_*.md; do
+# =================================== stage 2: 12 parallel per-theme union merges
+merge_theme() { # merge_theme <slug>
+  local slug=$1 max_draw=0 c f merge_try=1 merged="$RUN/merged/$slug.md"
+  for f in "$RUN"/draws_{a,b,c}/"$slug".md; do
     c=$(count_findings "$f"); (( c > max_draw )) && max_draw=$c
   done
-  merge_try=1
   while true; do
-    run_seat_linted "merge_try$merge_try" "$RUN/merge.prompt.md" "$RUN/merged.md" \
-      || die "stage 2: merge seat failed"
-    merged_count=$(count_findings "$RUN/merged.md")
+    run_seat_linted "merge_$slug" "$RUN/merge.$slug.prompt.md" "$merged" || return 1
+    local merged_count
+    merged_count=$(count_findings "$merged")
     if (( merged_count >= max_draw )); then break; fi
-    note "MERGE SHRINKAGE: merged=$merged_count < max draw=$max_draw (invariant: union can never shrink)"
-    echo "merge_shrinkage try$merge_try merged=$merged_count max_draw=$max_draw" >> "$RUN/harness_incidents.log"
-    (( merge_try >= 2 )) && die "stage 2: merge output smaller than a single draw twice — merge broke"
-    rm -f "$MARK/merge_try$merge_try.done"
+    note "MERGE SHRINKAGE ($slug): merged=$merged_count < max draw=$max_draw"
+    echo "merge_shrinkage theme=$slug try$merge_try merged=$merged_count max_draw=$max_draw" >> "$RUN/harness_incidents.log"
+    (( merge_try >= 2 )) && { note "theme $slug merge shrank twice — merge broke"; return 1; }
+    rm -f "$MARK/merge_$slug.done"
     {
-      cat "$RUN/merge.prompt.md"
+      cat "$RUN/merge.$slug.prompt.md"
       printf '\n\n# RETRY NOTICE\nYour previous merge produced %s findings but one draw alone has %s. A union can never have fewer findings than any single input. Re-merge, dropping nothing.\n' "$merged_count" "$max_draw"
-    } > "$RUN/merge.retry.prompt.md"
-    bash "$SEAT" "merge_retry" "$RUN/merge.retry.prompt.md" "$RUN/merged.md" "$WT" readonly || die "merge retry failed"
-    lint_loop "$RUN/merged.md" "$RUN/merge.retry.prompt.md" "merge_retry" || die "merge retry lint failed"
-    break
+    } > "$RUN/merge.$slug.retry.prompt.md"
+    bash "$SEAT" "merge_${slug}_retry" "$RUN/merge.$slug.retry.prompt.md" "$merged" "$WT" readonly || return 1
+    lint_loop "$merged" "$RUN/merge.$slug.retry.prompt.md" "merge_${slug}_retry" || return 1
+    merge_try=$(( merge_try + 1 ))
   done
-  note "merged findings: $(count_findings "$RUN/merged.md") (max single draw: $max_draw)"
+  note "theme $slug merged: $(count_findings "$merged") findings (max single draw: $max_draw)"
+}
+
+if ! done_marker stage2; then
+  t_start; note "stage 2: 12 per-theme union merges (parallel)"
+  mkdir -p "$RUN/merged"
+  pids=()
+  while IFS= read -r slug; do
+    [[ -n "$slug" ]] || continue
+    merge_theme "$slug" &
+    pids+=($!)
+  done < <(theme_slugs)
+  fail=0
+  for p in "${pids[@]}"; do wait "$p" || fail=1; done
+  (( fail )) && die "stage 2: at least one theme merge failed"
+  python3 "$RH/scripts/concat_merged.py" "$THEMES_TSV" "$RUN/merged" "$RUN" \
+    || die "concat_merged failed"
   t_end stage2_merge; mark_done stage2
 else note "skip stage 2 (marker)"; fi
 
@@ -178,12 +211,12 @@ if ! done_marker stage3; then
     fi
     lint_ok=0; snap_ok=0
     python3 "$LINT" "$RUN/depth.md" > "$RUN/depth.md.lint" 2>&1 && lint_ok=1
-    python3 "$SNAP" "$RUN/merged.md" "$RUN/depth.md" > "$RUN/depth.md.snap" 2>&1 && snap_ok=1
+    python3 "$SNAP" "$RUN/merged_all.md" "$RUN/depth.md" > "$RUN/depth.md.snap" 2>&1 && snap_ok=1
     (( lint_ok && snap_ok )) && break
     (( try >= 3 )) && {
-      echo "depth_failed_after_3 falling back to merged.md" >> "$RUN/harness_incidents.log"
-      note "stage 3 could not produce a valid add-only doc in 3 tries; falling back to merged.md verbatim"
-      cp "$RUN/merged.md" "$RUN/depth.md"
+      echo "depth_failed_after_3 falling back to merged_all.md" >> "$RUN/harness_incidents.log"
+      note "stage 3 could not produce a valid add-only doc in 3 tries; falling back to merged_all.md verbatim"
+      cp "$RUN/merged_all.md" "$RUN/depth.md"
       break
     }
     note "depth violations (try $try)"
@@ -193,7 +226,7 @@ if ! done_marker stage3; then
       cat "$RUN/depth.md.lint"
       printf '\n## Snapshot (add-only) check\n'
       cat "$RUN/depth.md.snap"
-      printf '\nReproduce the ORIGINAL merged.md content byte-identical and only APPEND clean blocks.\n'
+      printf '\nReproduce the ORIGINAL merged_all.md content byte-identical and only APPEND clean blocks.\n'
     } > "$RUN/depth.retry$try.prompt.md"
     try=$(( try + 1 ))
     bash "$SEAT" "depth_try$try" "$RUN/depth.retry$((try-1)).prompt.md" "$RUN/depth.md" "$WT" readonly || die "depth retry failed"

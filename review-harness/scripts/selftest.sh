@@ -124,6 +124,35 @@ open(f"{run}/synthesis_ledger.json","w").write(json.dumps(ledger))
 PY
 expect "kept-ratio floor rejected (1 unit / 3 inputs)" 1 python3 "$RH/scripts/fidelity_audit.py" "$RUNFIX"
 
+echo "== concat_merged =="
+CM="$TMP/cm"; mkdir -p "$CM/merged"
+printf 'theme-one\tcharter one\ntheme-two\tcharter two\n' > "$CM/themes.tsv"
+cat > "$CM/merged/theme-one.md" <<'EOF'
+### F1 — first defect
+severity: low
+evidence: a/b.py:1 — x
+scenario: "a → b"
+contract: fix one
+instances: single-instance
+
+### F2 — second defect
+severity: low
+evidence: a/c.py:2 — y
+scenario: "c → d"
+contract: fix two
+instances: single-instance
+EOF
+printf '### F1 — third defect\nseverity: low\nevidence: a/d.py:3 — z\nscenario: "e → f"\ncontract: fix three\ninstances: single-instance\n' > "$CM/merged/theme-two.md"
+expect "concat runs clean" 0 python3 "$RH/scripts/concat_merged.py" "$CM/themes.tsv" "$CM/merged" "$CM"
+grep -q '^### F3 — third defect' "$CM/merged_all.md" \
+  && ok "cross-theme renumbering (theme-two F1 -> global F3)" || bad "renumbering broken"
+python3 -c "
+import json,sys
+m=json.load(open('$CM/merged_all.md'.replace('merged_all.md','merged_map.json')))
+sys.exit(0 if m['F3']=={'theme':'theme-two','original_id':'F1'} else 1)" \
+  && ok "merged_map traceability" || bad "merged_map wrong"
+expect "concat output passes lint" 0 python3 "$RH/scripts/contract_lint.py" "$CM/merged_all.md"
+
 echo
 echo "selftest: $pass passed, $fail failed"
 exit $(( fail > 0 ))

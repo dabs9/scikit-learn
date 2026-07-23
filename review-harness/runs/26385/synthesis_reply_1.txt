@@ -1,3 +1,0 @@
-All three files written. Verifying the ledger covers every input id and units point to real deliverables.
-
-SYNTHESIS DONE

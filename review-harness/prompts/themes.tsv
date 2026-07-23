@@ -1,0 +1,12 @@
+logic-and-correctness	Wrong values, branches, and boundaries; off-by-one and edge conditions; unhandled cases; missing or wrong input validation.
+security-and-boundaries	Authn/authz gaps, injection, secrets/PII exposure, unsafe input handling, and misplaced trust in caller-supplied data.
+concurrency-async-and-error-paths	Races, resource leaks, cancellation, swallowed errors, fail-open fallthrough, and partial-failure states.
+tests-and-verification	Weakened expectations, tests that assert constants or their own literals, untested new code, and stale tests.
+type-and-interface-contracts	Casts where guards belong, optional/required drift, invalid-state shapes, and contract breaks between layers.
+duplication-and-single-sourcing	Copied logic, duplicate types/constants, ignored existing helpers, and cross-file value drift.
+dead-code-and-change-hygiene	Unused, superseded, or unreachable code; debug leftovers; unrelated bundling; files that should not be in the diff.
+readability-and-abstraction	Lying names, convoluted logic, speculative abstraction, and surprising side effects.
+docs-and-comments	Stale or wrong comments, missing invariant documentation on complex logic, and narration noise.
+data-access-and-performance	Chatty or sequential access, overfetch, hot-path waste, and algorithmic complexity regressions.
+module-boundaries-and-placement	Logic far from its data, wrong-layer placement, dependency direction, and leaked internals.
+build-config-and-operational-wiring	Build/CI/config completeness, env handling, packaging, and features wired but not registered (or vice versa).

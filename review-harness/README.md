@@ -23,17 +23,20 @@ RUN_LABEL=26385-local bash review-harness/run.sh
 
 ## Pipeline
 
-stage 0 inputs (manifest + hunks + prompt rendering) → stage 1 k=6 parallel reviewer draws
-(each: draft → contract lint → revise, ≤3 rounds) → stage 2 union merge (never drop; most
-specific wording verbatim; merge-shrinkage invariant enforced) → stage 3 add-only depth pass
-(snapshot-diff enforced) → stage 4 rule-closure sweep over the full manifest → stage 5
-inverse plan↔change inventory audit → stage 6 synthesis (verbatim selection into report.md +
-findings.json + synthesis_ledger.json) → stage 7 deterministic fidelity + preservation
-auditors (loop back into synthesis until clean, ≤3) → stage 8 local delivery + timings.
+stage 0 inputs (manifest + hunks + per-theme prompt rendering) → stage 1 three blind waves
+(a/b/c) of 12 theme seats each — 12 generic themes (prompts/themes.tsv) × 3 draws = 36
+seats, 12 concurrent per wave; each seat: draft → contract lint → revise (≤3 rounds) →
+stage 2 twelve parallel per-theme union merges (never drop; most specific wording verbatim;
+per-theme merge-shrinkage invariant), then deterministic concatenation/renumbering into
+merged_all.md (+merged_map.json) → stage 3 add-only depth pass (snapshot-diff enforced) →
+stage 4 rule-closure sweep over the full manifest → stage 5 inverse plan↔change inventory
+audit → stage 6 synthesis (verbatim selection into report.md + findings.json +
+synthesis_ledger.json) → stage 7 deterministic fidelity + preservation auditors (loop back
+into synthesis until clean, ≤3) → stage 8 local delivery + timings.
 
-Artifacts land in `runs/<label>/`: PLAN.md, DIFF_MANIFEST.md, draws/, merged.md, depth.md,
-closure.md, inverse.md, report.md, findings.json, synthesis_ledger.json, timings.tsv,
-harness_incidents.log, markers/.
+Artifacts land in `runs/<label>/`: PLAN.md, DIFF_MANIFEST.md, draws_a/ draws_b/ draws_c/,
+merged/, merged_all.md, merged_map.json, depth.md, closure.md, inverse.md, report.md,
+findings.json, synthesis_ledger.json, timings.tsv, harness_incidents.log, markers/.
 
 ## Selftest (no agents)
 
