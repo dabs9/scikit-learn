@@ -1,0 +1,109 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+logic-and-correctness.md F3: scenario lacks trigger→consequence arrow
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+Now I have enough evidence. Let me write my findings.
+
+### F1 — `_weighted_cluster_center` boolean-index mismatch when non-finite data is present
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:854-855 calls `self._weighted_cluster_center(X)` where `X` was reduced to finite rows at line 733 (`X = X[finite_index]`), while `self.labels_` was expanded to the full raw length at line 844 (`new_labels = np.empty(self._raw_data.shape[0], ...)` then `self.labels_ = new_labels`). Inside `_weighted_cluster_center` (line 908 `mask = self.labels_ == idx`, line 909 `data = X[mask]`) the mask has shape `(n_raw,)` but `X` has shape `(n_finite, n_features)`.
+scenario: "user calls `HDBSCAN(store_centers='centroid').fit(X)` on data containing `np.inf` or `np.nan` rows → boolean index dimension mismatch raises `IndexError` before any centroid/medoid is stored"
+contract: pass `self._raw_data` (the full validated data) to `_weighted_cluster_center` when non-finite rows were filtered, so the mask indexes over the same rows as `self.labels_`.
+instances: single-instance
+
+### F2 — `n_clusters` in `_weighted_cluster_center` fails to exclude the `-3` (missing) outlier label
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:895 — `n_clusters = len(set(self.labels_) - {-1, -2})`. Per `_OUTLIER_ENCODING` (lines 65-79) and the docstring at lines 561-563/572-573, `-3` is the "missing data" outlier label and should be excluded from cluster counts alongside `-1` and `-2`.
+scenario: "fit with samples containing `np.nan` and `store_centers='centroid'` → `n_clusters` is off by one; the `for idx in range(n_clusters)` loop then processes a non-existent `idx == n_actual_clusters` cluster whose `mask` is all `False`, triggering `ZeroDivisionError` from `np.average(empty, weights=empty, axis=0)`"
+contract: compute `n_clusters = len(set(self.labels_) - {-1, -2, -3})` (or equivalently `len(set(self.labels_[self.labels_ >= 0]))`) so all three outlier encodings are excluded.
+instances: single-instance
+
+### F3 — `_weighted_cluster_center` `mask` allocation shape wrong when non-finite rows exist
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:896 — `mask = np.empty((X.shape[0],), dtype=np.bool_)`. This pre-allocation is immediately overwritten on line 908 (`mask = self.labels_ == idx`), so the allocation is dead. However, the shape `(X.shape[0],)` documents an incorrect assumption that `X` and `self.labels_` share length — the same assumption that leads to F1.
+scenario: "the dead `mask = np.empty(...)` misleads readers/maintainers into believing `X.shape[0] == self.labels_.shape[0]`, and provides no runtime safety — the actual mask on line 908 has size `self.labels_.shape[0]`"
+contract: remove the dead pre-allocation on line 896; the loop assigns `mask` directly on line 908.
+instances: single-instance
+
+### F4 — `n_jobs` default of `4` contradicts the documented default of `None` [out-of-theme]
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:486-490 documents `n_jobs : int, default=None` with the standard sklearn semantics ("`None` means 1 unless in a `joblib.parallel_backend` context"), but the constructor signature at line 658 sets `n_jobs=4`. A user reading only the docstring will silently get 4-way parallelism instead of serial execution.
+scenario: "user constructs `HDBSCAN()` expecting serial execution per the docstring → gets 4-worker parallelism, oversubscribing threads inside a `joblib.parallel_backend` or on a shared host"
+contract: change the constructor default to `n_jobs=None` to match the documented sklearn convention.
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record, reviewing through ONE assigned theme lens. You are one of several
+mutually-blind reviewers; do not assume anyone else will catch what you skip. Your final
+response text IS the deliverable file — output only the findings document described below.
+
+# Your theme (you OWN this axis)
+
+Theme: logic-and-correctness
+Charter: Wrong values, branches, and boundaries; off-by-one and edge conditions; unhandled cases; missing or wrong input validation.
+
+Hunt this axis exhaustively across every changed file your theme could plausibly implicate.
+You must still report CRITICAL defects outside your theme that you stumble on — append
+" [out-of-theme]" to the title of any such finding. Do not pad: out-of-theme findings are
+for defects you actually verified while working your own axis.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /work/review-harness/runs/26385/PLAN.md
+- Diff manifest: /work/review-harness/runs/26385/DIFF_MANIFEST.md
+- Per-file hunk diffs: /tmp/rh-wt-26385/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /tmp/rh-wt-26385
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk every changed file your theme could plausibly implicate: read its hunk diff, then
+   open the full file in the worktree and verify what the hunk implies — never trust the
+   hunk alone. `.pyx`/`.pxd` Cython files are first-class changed code; review them as
+   carefully as `.py`.
+4. Review BOTH conformance directions through your theme's lens:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+6. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+The instances line must be EXACTLY one of those two forms — no annotations after
+"single-instance". Number findings sequentially from F1. No preamble, no summary, no
+headings other than the finding blocks, no hedging ("consider possibly" is banned). If you
+genuinely verified there is nothing to report on your axis, output exactly: NO FINDINGS

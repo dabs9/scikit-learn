@@ -1,0 +1,7 @@
+All three files written. The synthesis:
+- 77 delivered units from 126 input findings (61.1% survival, ≥60% required)
+- Max merge group size: 6 (compliant)
+- Every input id in the ledger, every ledger unit exists in findings.json
+- Verbatim blocks preserved byte-for-byte inside collapsed `<details>` sections
+
+SYNTHESIS DONE

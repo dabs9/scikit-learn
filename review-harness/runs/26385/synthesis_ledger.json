@@ -1,0 +1,506 @@
+{
+  "D:F1": {
+    "disposition": "kept-as",
+    "unit": "U2"
+  },
+  "D:F2": {
+    "disposition": "duplicate-of",
+    "unit": "U3"
+  },
+  "D:F3": {
+    "disposition": "duplicate-of",
+    "unit": "U26"
+  },
+  "D:F4": {
+    "disposition": "duplicate-of",
+    "unit": "U67"
+  },
+  "D:F5": {
+    "disposition": "duplicate-of",
+    "unit": "U23"
+  },
+  "D:F6": {
+    "disposition": "duplicate-of",
+    "unit": "U25"
+  },
+  "D:F7": {
+    "disposition": "duplicate-of",
+    "unit": "U68"
+  },
+  "D:F8": {
+    "disposition": "duplicate-of",
+    "unit": "U2"
+  },
+  "D:F9": {
+    "disposition": "duplicate-of",
+    "unit": "U3"
+  },
+  "D:F10": {
+    "disposition": "duplicate-of",
+    "unit": "U26"
+  },
+  "D:F11": {
+    "disposition": "kept-as",
+    "unit": "U15"
+  },
+  "D:F12": {
+    "disposition": "duplicate-of",
+    "unit": "U25"
+  },
+  "D:F13": {
+    "disposition": "kept-as",
+    "unit": "U5"
+  },
+  "D:F14": {
+    "disposition": "kept-as",
+    "unit": "U6"
+  },
+  "D:F15": {
+    "disposition": "kept-as",
+    "unit": "U4"
+  },
+  "D:F16": {
+    "disposition": "kept-as",
+    "unit": "U34"
+  },
+  "D:F17": {
+    "disposition": "kept-as",
+    "unit": "U32"
+  },
+  "D:F18": {
+    "disposition": "kept-as",
+    "unit": "U31"
+  },
+  "D:F19": {
+    "disposition": "kept-as",
+    "unit": "U27"
+  },
+  "D:F20": {
+    "disposition": "kept-as",
+    "unit": "U76"
+  },
+  "D:F21": {
+    "disposition": "kept-as",
+    "unit": "U75"
+  },
+  "D:F22": {
+    "disposition": "kept-as",
+    "unit": "U73"
+  },
+  "D:F23": {
+    "disposition": "kept-as",
+    "unit": "U74"
+  },
+  "D:F24": {
+    "disposition": "duplicate-of",
+    "unit": "U2"
+  },
+  "D:F25": {
+    "disposition": "duplicate-of",
+    "unit": "U3"
+  },
+  "D:F26": {
+    "disposition": "kept-as",
+    "unit": "U26"
+  },
+  "D:F27": {
+    "disposition": "kept-as",
+    "unit": "U22"
+  },
+  "D:F28": {
+    "disposition": "duplicate-of",
+    "unit": "U59"
+  },
+  "D:F29": {
+    "disposition": "duplicate-of",
+    "unit": "U25"
+  },
+  "D:F30": {
+    "disposition": "kept-as",
+    "unit": "U66"
+  },
+  "D:F31": {
+    "disposition": "kept-as",
+    "unit": "U47"
+  },
+  "D:F32": {
+    "disposition": "kept-as",
+    "unit": "U65"
+  },
+  "D:F33": {
+    "disposition": "duplicate-of",
+    "unit": "U5"
+  },
+  "D:F34": {
+    "disposition": "duplicate-of",
+    "unit": "U4"
+  },
+  "D:F35": {
+    "disposition": "kept-as",
+    "unit": "U3"
+  },
+  "D:F36": {
+    "disposition": "duplicate-of",
+    "unit": "U23"
+  },
+  "D:F37": {
+    "disposition": "duplicate-of",
+    "unit": "U46"
+  },
+  "D:F38": {
+    "disposition": "duplicate-of",
+    "unit": "U59"
+  },
+  "D:F39": {
+    "disposition": "duplicate-of",
+    "unit": "U43"
+  },
+  "D:F40": {
+    "disposition": "kept-as",
+    "unit": "U67"
+  },
+  "D:F41": {
+    "disposition": "duplicate-of",
+    "unit": "U5"
+  },
+  "D:F42": {
+    "disposition": "duplicate-of",
+    "unit": "U3"
+  },
+  "D:F43": {
+    "disposition": "duplicate-of",
+    "unit": "U11"
+  },
+  "D:F44": {
+    "disposition": "duplicate-of",
+    "unit": "U48"
+  },
+  "D:F45": {
+    "disposition": "duplicate-of",
+    "unit": "U46"
+  },
+  "D:F46": {
+    "disposition": "kept-as",
+    "unit": "U68"
+  },
+  "D:F47": {
+    "disposition": "kept-as",
+    "unit": "U59"
+  },
+  "D:F48": {
+    "disposition": "duplicate-of",
+    "unit": "U51"
+  },
+  "D:F49": {
+    "disposition": "duplicate-of",
+    "unit": "U28"
+  },
+  "D:F50": {
+    "disposition": "kept-as",
+    "unit": "U35"
+  },
+  "D:F51": {
+    "disposition": "duplicate-of",
+    "unit": "U72"
+  },
+  "D:F52": {
+    "disposition": "duplicate-of",
+    "unit": "U41"
+  },
+  "D:F53": {
+    "disposition": "kept-as",
+    "unit": "U54"
+  },
+  "D:F54": {
+    "disposition": "kept-as",
+    "unit": "U1"
+  },
+  "D:F55": {
+    "disposition": "duplicate-of",
+    "unit": "U2"
+  },
+  "D:F56": {
+    "disposition": "duplicate-of",
+    "unit": "U11"
+  },
+  "D:F57": {
+    "disposition": "kept-as",
+    "unit": "U23"
+  },
+  "D:F58": {
+    "disposition": "duplicate-of",
+    "unit": "U24"
+  },
+  "D:F59": {
+    "disposition": "kept-as",
+    "unit": "U25"
+  },
+  "D:F60": {
+    "disposition": "kept-as",
+    "unit": "U33"
+  },
+  "D:F61": {
+    "disposition": "duplicate-of",
+    "unit": "U54"
+  },
+  "D:F62": {
+    "disposition": "duplicate-of",
+    "unit": "U62"
+  },
+  "D:F63": {
+    "disposition": "kept-as",
+    "unit": "U58"
+  },
+  "D:F64": {
+    "disposition": "kept-as",
+    "unit": "U53"
+  },
+  "D:F65": {
+    "disposition": "kept-as",
+    "unit": "U41"
+  },
+  "D:F66": {
+    "disposition": "duplicate-of",
+    "unit": "U44"
+  },
+  "D:F67": {
+    "disposition": "duplicate-of",
+    "unit": "U46"
+  },
+  "D:F68": {
+    "disposition": "kept-as",
+    "unit": "U63"
+  },
+  "D:F69": {
+    "disposition": "duplicate-of",
+    "unit": "U28"
+  },
+  "D:F70": {
+    "disposition": "kept-as",
+    "unit": "U48"
+  },
+  "D:F71": {
+    "disposition": "duplicate-of",
+    "unit": "U1"
+  },
+  "D:F72": {
+    "disposition": "kept-as",
+    "unit": "U28"
+  },
+  "D:F73": {
+    "disposition": "kept-as",
+    "unit": "U8"
+  },
+  "D:F74": {
+    "disposition": "kept-as",
+    "unit": "U9"
+  },
+  "D:F75": {
+    "disposition": "kept-as",
+    "unit": "U24"
+  },
+  "D:F76": {
+    "disposition": "duplicate-of",
+    "unit": "U3"
+  },
+  "D:F77": {
+    "disposition": "duplicate-of",
+    "unit": "U33"
+  },
+  "D:F78": {
+    "disposition": "kept-as",
+    "unit": "U11"
+  },
+  "D:F79": {
+    "disposition": "kept-as",
+    "unit": "U10"
+  },
+  "D:F80": {
+    "disposition": "kept-as",
+    "unit": "U51"
+  },
+  "D:F81": {
+    "disposition": "kept-as",
+    "unit": "U62"
+  },
+  "D:F82": {
+    "disposition": "duplicate-of",
+    "unit": "U53"
+  },
+  "D:F83": {
+    "disposition": "kept-as",
+    "unit": "U42"
+  },
+  "D:F84": {
+    "disposition": "kept-as",
+    "unit": "U40"
+  },
+  "D:F85": {
+    "disposition": "kept-as",
+    "unit": "U57"
+  },
+  "D:F86": {
+    "disposition": "kept-as",
+    "unit": "U55"
+  },
+  "D:F87": {
+    "disposition": "kept-as",
+    "unit": "U56"
+  },
+  "D:F88": {
+    "disposition": "kept-as",
+    "unit": "U50"
+  },
+  "D:F89": {
+    "disposition": "kept-as",
+    "unit": "U69"
+  },
+  "D:F90": {
+    "disposition": "kept-as",
+    "unit": "U36"
+  },
+  "D:F91": {
+    "disposition": "duplicate-of",
+    "unit": "U24"
+  },
+  "D:F92": {
+    "disposition": "kept-as",
+    "unit": "U39"
+  },
+  "D:F93": {
+    "disposition": "duplicate-of",
+    "unit": "U8"
+  },
+  "D:F94": {
+    "disposition": "kept-as",
+    "unit": "U44"
+  },
+  "D:F95": {
+    "disposition": "kept-as",
+    "unit": "U45"
+  },
+  "D:F96": {
+    "disposition": "kept-as",
+    "unit": "U49"
+  },
+  "D:F97": {
+    "disposition": "kept-as",
+    "unit": "U60"
+  },
+  "D:F98": {
+    "disposition": "kept-as",
+    "unit": "U14"
+  },
+  "D:F99": {
+    "disposition": "kept-as",
+    "unit": "U21"
+  },
+  "D:F100": {
+    "disposition": "kept-as",
+    "unit": "U13"
+  },
+  "D:F101": {
+    "disposition": "duplicate-of",
+    "unit": "U26"
+  },
+  "D:F102": {
+    "disposition": "kept-as",
+    "unit": "U16"
+  },
+  "D:F103": {
+    "disposition": "kept-as",
+    "unit": "U17"
+  },
+  "D:F104": {
+    "disposition": "kept-as",
+    "unit": "U18"
+  },
+  "D:F105": {
+    "disposition": "kept-as",
+    "unit": "U20"
+  },
+  "D:F106": {
+    "disposition": "kept-as",
+    "unit": "U19"
+  },
+  "D:F107": {
+    "disposition": "kept-as",
+    "unit": "U46"
+  },
+  "D:F108": {
+    "disposition": "kept-as",
+    "unit": "U64"
+  },
+  "D:F109": {
+    "disposition": "kept-as",
+    "unit": "U70"
+  },
+  "D:F110": {
+    "disposition": "kept-as",
+    "unit": "U29"
+  },
+  "D:F111": {
+    "disposition": "kept-as",
+    "unit": "U43"
+  },
+  "D:F112": {
+    "disposition": "kept-as",
+    "unit": "U38"
+  },
+  "D:F113": {
+    "disposition": "kept-as",
+    "unit": "U71"
+  },
+  "D:F114": {
+    "disposition": "kept-as",
+    "unit": "U61"
+  },
+  "D:F115": {
+    "disposition": "kept-as",
+    "unit": "U52"
+  },
+  "D:F116": {
+    "disposition": "duplicate-of",
+    "unit": "U72"
+  },
+  "D:F117": {
+    "disposition": "duplicate-of",
+    "unit": "U1"
+  },
+  "D:F118": {
+    "disposition": "kept-as",
+    "unit": "U30"
+  },
+  "D:F119": {
+    "disposition": "kept-as",
+    "unit": "U12"
+  },
+  "D:F120": {
+    "disposition": "duplicate-of",
+    "unit": "U33"
+  },
+  "D:F121": {
+    "disposition": "kept-as",
+    "unit": "U72"
+  },
+  "D:F122": {
+    "disposition": "duplicate-of",
+    "unit": "U11"
+  },
+  "C:F1": {
+    "disposition": "kept-as",
+    "unit": "U37"
+  },
+  "C:F2": {
+    "disposition": "kept-as",
+    "unit": "U77"
+  },
+  "C:F3": {
+    "disposition": "kept-as",
+    "unit": "U7"
+  },
+  "I:F1": {
+    "disposition": "duplicate-of",
+    "unit": "U35"
+  }
+}
