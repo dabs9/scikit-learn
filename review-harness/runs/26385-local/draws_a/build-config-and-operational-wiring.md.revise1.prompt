@@ -1,0 +1,111 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+build-config-and-operational-wiring.md F4: hedged contract ('either ... or'); pin ONE recommendation
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+Now let me verify hdbscan tests directory `__init__.py` and `test_reachibility.py` typo. Since pytest discovers by `test_*.py`, this file will still run. Typo is cosmetic/naming.
+
+I have enough evidence for findings.
+
+### F1 — `.pxd` declares `noexcept` but `.pyx` implementation omits it, causing Cython 3 signature mismatch
+severity: medium
+evidence: sklearn/cluster/_hierarchical_fast.pxd:8-9 declares `cdef void union(self, intp_t m, intp_t n) noexcept` and `cdef intp_t fast_find(self, intp_t n) noexcept`, while sklearn/cluster/_hierarchical_fast.pyx:331 and :339 define them as `cdef void union(self, intp_t m, intp_t n):` and `cdef intp_t fast_find(self, intp_t n):` with no `noexcept` qualifier.
+scenario: "Building with Cython 3.x → 'Function signature does not match previous declaration' warning (or hard error if `-Werror` / cython-lint-strict is enforced), and the two functions carry different exception-checking semantics depending on which declaration Cython chose."
+contract: The `.pyx` method signatures for `UnionFind.union` and `UnionFind.fast_find` must be updated to include the `noexcept` qualifier so they match the newly added `.pxd` declarations exactly.
+instances: [sklearn/cluster/_hierarchical_fast.pyx:331, sklearn/cluster/_hierarchical_fast.pyx:339]
+
+### F2 — `HDBSCAN.__init__` default `n_jobs=4` contradicts its own documented `default=None`
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:486-490 documents `n_jobs : int, default=None` with "`None` means 1 unless in a :obj:`joblib.parallel_backend` context", but the constructor at sklearn/cluster/_hdbscan/hdbscan.py:658 uses `n_jobs=4,` as the actual default.
+scenario: "User instantiates `HDBSCAN()` on a shared/CI machine expecting single-threaded behavior per the docs → four parallel worker threads spawn against the pairwise distance computation, oversubscribing cores and breaking reproducibility relative to the documented contract."
+contract: The `__init__` default for `n_jobs` must be `None` to match the documented `default=None` semantics used across the rest of the sklearn API (DBSCAN, OPTICS, etc.).
+instances: single-instance
+
+### F3 — HDBSCAN test module misnamed `test_reachibility.py`
+severity: low
+evidence: sklearn/cluster/_hdbscan/tests/test_reachibility.py exists; directory listing confirms no `test_reachability.py`. The underlying module under test is `sklearn/cluster/_hdbscan/_reachability.py[x]` (correctly spelled) — see the import at sklearn/cluster/_hdbscan/tests/test_reachibility.py:9 `from sklearn.cluster._hdbscan._reachability import mutual_reachability_graph`.
+scenario: "Developer greps or navigates via IDE for `test_reachability` and finds nothing → the test file for the reachability graph is invisible to expected discovery patterns, and the misspelling propagates to future PRs that reference it."
+contract: Rename the file to `test_reachability.py` to match the module it tests.
+instances: single-instance
+
+### F4 — `HDBSCAN` docstring `Examples` block will fail doctest when run without a network / with a differently-shipped `load_digits`
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:604-613 shows a doctest that hard-codes exact cluster labels (`array([ 2,  6, -1, ..., -1, -1, -1])`) from `HDBSCAN(min_cluster_size=20).fit(load_digits(...))`, but the default constructor also sets `n_jobs=4` (F2) which triggers parallel pairwise-distance computation whose outputs are not deterministic across BLAS thread counts. [out-of-theme]
+scenario: "sklearn docs/doctest CI runs the example under a different BLAS thread configuration → labels differ slightly and the doctest fails."
+contract: Either seed / pin the pairwise computation to a single thread in the doctest (e.g., pass `n_jobs=1`) or use `# doctest: +SKIP`/`# doctest: +ELLIPSIS` with tolerant matching so the example remains stable across environments.
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record, reviewing through ONE assigned theme lens. You are one of several
+mutually-blind reviewers; do not assume anyone else will catch what you skip. Your final
+response text IS the deliverable file — output only the findings document described below.
+
+# Your theme (you OWN this axis)
+
+Theme: build-config-and-operational-wiring
+Charter: Build/CI/config completeness, env handling, packaging, and features wired but not registered (or vice versa).
+
+Hunt this axis exhaustively across every changed file your theme could plausibly implicate.
+You must still report CRITICAL defects outside your theme that you stumble on — append
+" [out-of-theme]" to the title of any such finding. Do not pad: out-of-theme findings are
+for defects you actually verified while working your own axis.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/PLAN.md
+- Diff manifest: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/DIFF_MANIFEST.md
+- Per-file hunk diffs: /Users/dabs/Development/rh-wt-26385-local/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /Users/dabs/Development/rh-wt-26385-local
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk every changed file your theme could plausibly implicate: read its hunk diff, then
+   open the full file in the worktree and verify what the hunk implies — never trust the
+   hunk alone. `.pyx`/`.pxd` Cython files are first-class changed code; review them as
+   carefully as `.py`.
+4. Review BOTH conformance directions through your theme's lens:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+6. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+The instances line must be EXACTLY one of those two forms — no annotations after
+"single-instance". Number findings sequentially from F1. No preamble, no summary, no
+headings other than the finding blocks, no hedging ("consider possibly" is banned). If you
+genuinely verified there is nothing to report on your axis, output exactly: NO FINDINGS

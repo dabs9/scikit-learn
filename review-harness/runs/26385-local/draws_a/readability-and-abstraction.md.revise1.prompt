@@ -1,0 +1,243 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+readability-and-abstraction.md F1: missing scenario: "..." line
+readability-and-abstraction.md F2: missing scenario: "..." line
+readability-and-abstraction.md F3: missing scenario: "..." line
+readability-and-abstraction.md F4: missing scenario: "..." line
+readability-and-abstraction.md F5: missing scenario: "..." line
+readability-and-abstraction.md F6: missing scenario: "..." line
+readability-and-abstraction.md F7: missing scenario: "..." line
+readability-and-abstraction.md F8: missing scenario: "..." line
+readability-and-abstraction.md F9: missing scenario: "..." line
+readability-and-abstraction.md F9: hedged contract ('and/or'); pin ONE recommendation
+readability-and-abstraction.md F10: missing scenario: "..." line
+readability-and-abstraction.md F11: missing scenario: "..." line
+readability-and-abstraction.md F12: missing scenario: "..." line
+readability-and-abstraction.md F13: missing scenario: "..." line
+readability-and-abstraction.md F14: missing scenario: "..." line
+readability-and-abstraction.md F15: missing scenario: "..." line
+readability-and-abstraction.md F16: missing scenario: "..." line
+readability-and-abstraction.md F17: missing scenario: "..." line
+readability-and-abstraction.md F18: missing scenario: "..." line
+readability-and-abstraction.md F19: missing scenario: "..." line
+readability-and-abstraction.md F20: missing scenario: "..." line
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+Confirmed. The test uses `algorithm="prims_kdtree"` and `"prims_balltree"` which are not in the valid options `{"auto", "brute", "kdtree", "balltree"}`. Test passes only because `_validate_params` raises `ValueError` for the bogus algorithm name, not because of the "precomputed vs. tree" logic the test purports to verify.
+
+Now I have enough evidence. Let me write the findings.
+
+### F1 — Comment in `fit` misdocuments outlier label mapping
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:832-833 — "# Remap indices to align with original data in the case of / # non-finite entries. Samples with np.inf are mapped to -1 and / # those with np.nan are mapped to -2."
+scenario: reader trusts the comment → reader believes np.inf → label -1 and np.nan → label -2, but `_OUTLIER_ENCODING` in the same file (lines 65-79) actually assigns np.inf → -2 and np.nan → -3, which is what the code at lines 842-843 does; comment is a lying name for the behavior.
+contract: Update the comment to match `_OUTLIER_ENCODING`: np.inf → -2 (infinite), np.nan → -3 (missing).
+instances: single-instance
+
+### F2 — `test_hdbscan_precomputed_non_brute` never exercises the code path it claims to test
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:276-284 — `algorithm=f"prims_{tree}tree"` produces `"prims_kdtree"`/`"prims_balltree"`, values not in the `algorithm` `StrOptions({"auto","brute","kdtree","balltree"})` at sklearn/cluster/_hdbscan/hdbscan.py:629-638.
+scenario: developer changes precomputed+kdtree/balltree error emission → this test still passes because the `ValueError` is raised by `_validate_params` on the invalid algorithm name (lying test name/intent); the actual error branch (line 772-783) is untested.
+contract: Change the parametrization to `["kd", "ball"]` producing `f"{tree}tree"` so the algorithm strings are `"kdtree"`/`"balltree"` and the intended validation branch runs.
+instances: single-instance
+
+### F3 — Scale-invariance loop never applies the scale [out-of-theme]
+severity: medium
+evidence: examples/cluster/plot_hdbscan.py:106-110 — `for idx, scale in enumerate((1, 0.5, 3)): hdb.fit(X); plot(X, hdb.labels_, ...)`; the DBSCAN analogue immediately above at lines 87-89 correctly uses `dbs.fit(X * scale)` and `plot(X * scale, ...)`.
+scenario: user reads the HDBSCAN scale-invariance demo → all three subplots show identical clustering of un-scaled `X` (misleadingly implying scale invariance from a degenerate experiment), instead of the intended comparison of clustering the scaled data.
+contract: Fit and plot on `X * scale` (mirroring the DBSCAN block): `hdb.fit(X * scale); plot(X * scale, hdb.labels_, hdb.probabilities_, ax=axes[idx], parameters={"scale": scale})`.
+instances: single-instance
+
+### F4 — `remap_single_linkage_tree` docstring omits its return value
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:351-393 — docstring documents Parameters but no `Returns` section; the function does return `tree` (line 393) and callers rely on the return value (line 834 `self._single_linkage_tree_ = remap_single_linkage_tree(...)`).
+scenario: reader/API user reads only the docstring → assumes the mutating name means in-place, misses that a fresh, concatenated array is returned.
+contract: Add a `Returns` section documenting the returned `ndarray of shape (n_samples,), dtype=HIERARCHY_dtype` and clarify it is not an in-place update.
+instances: single-instance
+
+### F5 — `_brute_mst` docstring `min_samples` default lies
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:95 — "min_samples : int, default=None" but the signature at line 82 is `def _brute_mst(mutual_reachability, min_samples):` (required positional, no default).
+scenario: reader trusts docstring default → believes calling `_brute_mst(mr)` is valid; actually raises `TypeError` for missing positional arg. Also parroted by `_hdbscan_brute` (line 179) and `_hdbscan_prims` (line 290) where the signatures use `min_samples=5`.
+contract: Remove the "default=None" claim (or specify the correct defaults matching each function's signature).
+instances: [sklearn/cluster/_hdbscan/hdbscan.py:95, sklearn/cluster/_hdbscan/hdbscan.py:179, sklearn/cluster/_hdbscan/hdbscan.py:290]
+
+### F6 — `_hdbscan_brute` accepts `alpha=None` default but divides by it
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:161 — `alpha=None,`; line 241 `distance_matrix /= alpha` will raise `TypeError` when `alpha=None`. Docstring at line 183 lies about the default: "alpha : float, default=1.0".
+scenario: any caller not passing `alpha` (only the class currently does at line 767) → `TypeError: unsupported operand type(s) for /=: 'numpy.ndarray' and 'NoneType'`. The API contract of the helper is broken and the docstring is a lying default.
+contract: Change the signature to `alpha=1.0` to match the documented default and the actual class default.
+instances: single-instance
+
+### F7 — Overwritten `births` allocation is dead code
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:252-254 — `births = np.full(largest_child + 1, np.nan, dtype=np.float64)` followed immediately by `births = np.full(largest_child + 1, np.nan, dtype=np.float64)`; the first allocation is unconditionally overwritten before use.
+scenario: reader tries to understand initialization → confused by the duplication; small allocation cost happens twice on every clustering.
+contract: Delete the duplicate line 252 (or 254).
+instances: single-instance
+
+### F8 — `_do_labelling` sizes `result` by root cluster id, not sample count
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:480-481 — `root_cluster = np.min(parent_array); result = np.empty(root_cluster, dtype=np.intp)`. `root_cluster` is the smallest parent id (== `n_samples`) by convention in the condensed-tree encoding, so this is a surprising cross-reference that reads as "allocate a cluster-id-many array" but actually happens to equal `n_samples`.
+scenario: someone changes the condensed-tree id offset (e.g. renumbering conventions) → silent wrong allocation size; the invariant "smallest parent id == n_samples" is nowhere stated in code or comments and is not defensively asserted.
+contract: Name/derive `n_samples` explicitly (as done elsewhere, e.g. line 90) and allocate `result = np.empty(n_samples, dtype=np.intp)`, with an assertion or comment pinning the invariant.
+instances: single-instance
+
+### F9 — `_dense_mutual_reachability_graph` is silently non-symmetric on non-symmetric input
+severity: low
+evidence: sklearn/cluster/_hdbscan/_reachability.pyx:130-149 — comment says "We assume that the distance matrix is symmetric" but the algorithm only computes `core_distances` row-wise via `np.partition` on each row. If the caller violates the unstated symmetry precondition, results are silently wrong; there is no assertion or docstring warning at the function boundary (in contrast to `_hdbscan_brute` which does check symmetry only when `metric="precomputed"`).
+scenario: internal caller passes a non-symmetric matrix (e.g. future refactor bypasses the `_hdbscan_brute` symmetry check) → silently wrong core distances and mutual reachabilities, no error surfaced.
+contract: Move the symmetry precondition into the function docstring's Parameters section and/or add a debug-mode assertion; do not rely on a hidden invariant established by one particular caller.
+instances: single-instance
+
+### F10 — `_get_finite_row_indices` sparse branch surprises on non-LIL input
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:396-407 — for sparse input the function calls `matrix.tolil().data` and iterates rows; every call on a CSR matrix silently converts (LIL construction cost) and iterates the explicit stored values only. Rows without stored `nan`/`inf` in non-stored positions are treated as finite. The function name promises "purely finite rows" but implicit zeros are considered finite by construction (which is correct in a distance-matrix context but not stated). The function is called on both sparse feature matrices and sparse precomputed distance matrices (via `fit`).
+scenario: sparse feature matrix (not distance matrix) with an explicit `nan` stored in a row but implicit zeros elsewhere → the row is dropped, but a row with sparsity-implied zeros that "should" be non-finite is kept. Silent surprising side effect due to a name that overstates the semantics.
+contract: Rename or scope the helper (e.g. `_get_finite_row_indices_of_stored_entries`) and document that only stored values are inspected for sparse inputs.
+instances: single-instance
+
+### F11 — `n_jobs` default hard-codes 4 workers, contradicting docstring
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:658 — `n_jobs=4,`; docstring at lines 486-490 says `n_jobs : int, default=None` and "``None`` means 1 unless in a :obj:`joblib.parallel_backend` context. ``-1`` means using all processors."
+scenario: user constructs `HDBSCAN()` expecting sklearn convention (`n_jobs=None`) → estimator silently spawns 4 workers regardless of the surrounding `joblib.parallel_backend`; docstring is a lying default and the class violates sklearn's `n_jobs` convention.
+contract: Change the signature default to `n_jobs=None` to match the documented behavior and sklearn convention.
+instances: single-instance
+
+### F12 — `_weighted_cluster_center` counts only `{-1, -2}` as outlier labels
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:894-895 — `# Number of non-noise clusters / n_clusters = len(set(self.labels_) - {-1, -2})`. `_OUTLIER_ENCODING` defines three outlier labels: `-1` (noise), `-2` (infinite), `-3` (missing) (lines 65-79 and class docstring lines 534-537).
+scenario: user with missing (`np.nan`) samples calls `fit` with `store_centers="centroid"` → `n_clusters` is over-counted by 1, `self.centroids_` is allocated with one extra row that is never written (contains uninitialized memory from `np.empty`) and the loop over `range(n_clusters)` iterates past the true cluster count, hitting an empty `data[mask]` and producing warnings / NaN centroids for the phantom cluster index.
+contract: Compute `n_clusters = len(set(self.labels_) - {-1, -2, -3})` (or subtract `{lbl for _, o in _OUTLIER_ENCODING.items() for lbl in [o["label"]]} | {-1}`).
+instances: single-instance
+
+### F13 — `mutual_reachability_` variable's trailing underscore is meaningless noise
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:251 — `mutual_reachability_ = mutual_reachability_graph(...)` — local variable named with trailing underscore normally reserved (in sklearn convention) for fitted-attribute names on estimators, not local variables; misleading nomenclature.
+scenario: reader scanning for estimator attributes → is briefly misled into thinking `mutual_reachability_` is set on `self`; churns cognitive load. Trivial but a false abstraction signal.
+contract: Rename to `mutual_reachability` (no trailing underscore) since it is a local.
+instances: single-instance
+
+### F14 — `traverse_upwards` compares scalar to array from boolean-indexing without `.item()`
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:586-593 — `parent = cluster_tree[cluster_tree['child'] == leaf]['parent']` yields a 1-D ndarray, then compared `if parent == root:` (elementwise, returns an ndarray) and later `parent_eps = 1 / cluster_tree[cluster_tree['child'] == parent]['value']`. Cython typing on line 582 declares `cnp.intp_t parent` but the RHS is an array; Cython will attempt scalar coercion (works only when the array happens to have length 1). Similar pattern in `_do_labelling` at line 498 (`parent_lambda = lambda_array[child_array == n]`) and in `_get_clusters` (line 745 `eom_clusters[0]`). This is speculative abstraction: leans on hidden "always length 1" invariants.
+scenario: any condensed_tree encoding where `child == leaf` matches 0 or >1 rows (e.g. malformed input, or a future encoding change) → silent wrong comparison or crash; behavior is not documented at the function boundary.
+contract: Extract the scalar explicitly (e.g. `.item()` on a `[0]`-indexed sub-array) and document/assert the "exactly one row" invariant at the call site.
+instances: [sklearn/cluster/_hdbscan/_tree.pyx:586, sklearn/cluster/_hdbscan/_tree.pyx:593, sklearn/cluster/_hdbscan/_tree.pyx:498]
+
+### F15 — `_do_labelling` uses undeclared `label` variable
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:467-508 — the `cdef` block (467-474) declares locals but omits `label` and `parent_lambda`. `label` is assigned at line 492 and used at lines 494/506/508; `parent_lambda` at line 498. Cython infers these as Python objects, defeating the surrounding typed-loop optimization and making a hot loop pay object overhead for `label`.
+scenario: reviewer expects the `cdef` block to enumerate all locals → surprise typed/untyped split; the untyped `label` prevents `result[n] = label` from becoming a pure C store, silently slowing the loop.
+contract: Add `cnp.intp_t label` and `cnp.float64_t parent_lambda` to the `cdef:` block.
+instances: single-instance
+
+### F16 — `test_hdbscan_centers` accepts `rtol=1` which admits ~100% error
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:319-320 — `assert_allclose(center, centroid, rtol=1, atol=0.05)` with `rtol=1` means a centroid up to `1.0 * |center| + 0.05` off passes; for `center=(3.0,3.0)` that permits a centroid anywhere in `[0, 6]` per coordinate.
+scenario: regression that pushes centroids drastically toward the wrong cluster → test still passes; the assertion name promises verification, but the tolerance renders it a lying check.
+contract: Use a small `rtol` (e.g. `rtol=0.1`) that actually constrains centroid quality on the known blob geometry.
+instances: single-instance
+
+### F17 — `_condense_tree` writes bool dtype into a `uint8` view
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:151, 161 — `cnp.uint8_t[::1] ignore` then `ignore = np.zeros(len(node_list), dtype=bool)`. `np.bool_` and `np.uint8` are distinct dtypes; the memoryview assignment relies on identical itemsize but the surface-level type mismatch obscures intent (why declare `uint8` and initialize with `bool`?).
+scenario: future NumPy where `bool` dtype layout changes, or a maintainer refactoring the memoryview annotation → silent breakage of a bare-metal assumption; comment/name does not explain the intentional aliasing.
+contract: Use `dtype=np.uint8` in the `np.zeros` call to match the declared memoryview type.
+instances: single-instance
+
+### F18 — `n_samples` docstring shape mismatches actual shape for tree/condensed arrays
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:129, 138, 447, 656 — Parameters/Returns say `ndarray of shape (n_samples,), dtype=HIERARCHY_dtype` (or `CONDENSED_dtype`), yet the actual `HIERARCHY_t` array is size `n_samples - 1` (single linkage tree encoding) and the condensed tree is size variable ≠ `n_samples`. `hdbscan.py:101, 148, 219, 325, 360` correctly document the linkage tree shape as `(n_samples - 1,)`, so this is inconsistent documentation, not a naming choice.
+scenario: user or maintainer following the `_tree.pyx` docstring → allocates or slices with wrong length; the array-shape claim is a lying contract at the function boundary.
+contract: Update `_tree.pyx` docstrings to state `(n_samples - 1,)` for `HIERARCHY_dtype` arrays and clarify that `CONDENSED_dtype` arrays have variable length (edge count of the condensed tree).
+instances: [sklearn/cluster/_hdbscan/_tree.pyx:129, sklearn/cluster/_hdbscan/_tree.pyx:138, sklearn/cluster/_hdbscan/_tree.pyx:371, sklearn/cluster/_hdbscan/_tree.pyx:447, sklearn/cluster/_hdbscan/_tree.pyx:656]
+
+### F19 — `_process_mst` docstring claims MST is sorted in-place; caller may not expect side effect
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:151-155 — `row_order = np.argsort(min_spanning_tree["distance"]); min_spanning_tree = min_spanning_tree[row_order]`. Docstring at lines 136-149 says "The MST is first sorted then processed" but does not clarify whether the caller's MST array is mutated. `argsort` + fancy indexing produces a new array (safe here), so the docstring's phrasing "MST is first sorted" is a surprising in-place-sounding side-effect promise that is not actually delivered — a mild lying name for the operation.
+scenario: reader expecting in-place mutation (per the wording) → misuses the return value or the argument; no functional bug today, but the doc/code split is misleading.
+contract: Reword the docstring to "A sorted copy of the MST edges is used internally" or similar.
+instances: single-instance
+
+### F20 — `_get_clusters` reuses `n_samples` name for the largest per-point child id
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:714 — `n_samples = np.max(condensed_tree[condensed_tree['cluster_size'] == 1]['child']) + 1`. Elsewhere `n_samples` is derived from `hierarchy.shape[0] + 1` (line 90/146) or `root // 2 + 1` (line 397). Here it happens to equal the true sample count only if every sample appears as a leaf in the condensed tree — a fragile invariant that is never asserted.
+scenario: condensed tree that (post-condensation) does not include every sample as a leaf → `n_samples` under-counted, downstream `max_cluster_size` sentinel at line 717 (`n_samples + 1`) becomes wrong and can silently trigger the `cluster_sizes[node] > max_cluster_size` branch at line 733.
+contract: Pass or derive the true `n_samples` from the caller (e.g., single-linkage tree length + 1) instead of inferring it from a max-child computation.
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record, reviewing through ONE assigned theme lens. You are one of several
+mutually-blind reviewers; do not assume anyone else will catch what you skip. Your final
+response text IS the deliverable file — output only the findings document described below.
+
+# Your theme (you OWN this axis)
+
+Theme: readability-and-abstraction
+Charter: Lying names, convoluted logic, speculative abstraction, and surprising side effects.
+
+Hunt this axis exhaustively across every changed file your theme could plausibly implicate.
+You must still report CRITICAL defects outside your theme that you stumble on — append
+" [out-of-theme]" to the title of any such finding. Do not pad: out-of-theme findings are
+for defects you actually verified while working your own axis.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/PLAN.md
+- Diff manifest: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/DIFF_MANIFEST.md
+- Per-file hunk diffs: /Users/dabs/Development/rh-wt-26385-local/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /Users/dabs/Development/rh-wt-26385-local
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk every changed file your theme could plausibly implicate: read its hunk diff, then
+   open the full file in the worktree and verify what the hunk implies — never trust the
+   hunk alone. `.pyx`/`.pxd` Cython files are first-class changed code; review them as
+   carefully as `.py`.
+4. Review BOTH conformance directions through your theme's lens:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+6. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+The instances line must be EXACTLY one of those two forms — no annotations after
+"single-instance". Number findings sequentially from F1. No preamble, no summary, no
+headings other than the finding blocks, no hedging ("consider possibly" is banned). If you
+genuinely verified there is nothing to report on your axis, output exactly: NO FINDINGS

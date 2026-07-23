@@ -1,0 +1,69 @@
+### F1 — `test_hdbscan_precomputed_non_brute` uses invalid algorithm strings, passes for the wrong reason
+severity: high
+evidence: sklearn/cluster/tests/test_hdbscan.py:276-284 — the test constructs `HDBSCAN(metric="precomputed", algorithm=f"prims_{tree}tree")` where the algorithm string is `"prims_kdtree"`/`"prims_balltree"`, but the estimator's `_parameter_constraints` (hdbscan.py:629-638) only accepts `{"auto", "brute", "kdtree", "balltree"}`. The `ValueError` raised is `InvalidParameterError` (from `_validate_params`, which extends `ValueError`), not the intended "precomputed data incompatible with tree" error. In fact, hdbscan.py:772-818 contains no code path that rejects `metric="precomputed"` when `algorithm="kdtree"`/`"balltree"`; the branch at line 785 silently dispatches to `_hdbscan_prims`.
+scenario: "user passes metric='precomputed' with algorithm='kdtree'/'balltree' → test claims coverage but code path is unexercised; real behavior is untested (silent misroute to `_hdbscan_prims`)"
+contract: The test must use the actually-supported strings (`algorithm="kdtree"`/`"balltree"`) and match against the specific error message the codebase intends to raise; if no such rejection exists in the estimator, the missing validation must be added and then covered by a matched-message test.
+instances: single-instance
+
+### F2 — `test_hdbscan_centers` uses `rtol=1`, effectively disabling the centroid/medoid accuracy check for non-zero centers
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:319-320 — `assert_allclose(center, centroid, rtol=1, atol=0.05)` and same for `medoid`. With `rtol=1`, the tolerance for `center=(3.0, 3.0)` becomes `atol + rtol*|3| = 3.05`, i.e. any value in `[-0.05, 6.05]` passes. Only the `(0, 0)` center is effectively constrained (to `atol=0.05`). The stated intent in the docstring is that centers "are accurate to the data".
+scenario: "centroid computation regresses for any non-zero-centered cluster → test still passes because rtol=1 permits ~100% relative error"
+contract: Drop `rtol=1` and use only a tight `atol` (or `rtol` ≪ 1 like `rtol=0.05`) so the check reflects the "accurate to the data" contract.
+instances: [sklearn/cluster/tests/test_hdbscan.py:319, sklearn/cluster/tests/test_hdbscan.py:320]
+
+### F3 — `test_hdbscan_min_cluster_size` filter excludes only `-1`, ignoring `-2`/`-3` outlier labels
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:261-263 — `true_labels = [label for label in labels if label != -1]` then `np.bincount(true_labels)`. `np.bincount` requires non-negative integers and will raise `ValueError` if `-2`/`-3` (defined in `_OUTLIER_ENCODING`) are present. The correct filter would use `OUTLIER_SET` (defined at line 37) which the file already imports/constructs for exactly this purpose.
+scenario: "input triggers infinite/missing outlier labels (-2/-3) → test crashes with numpy bincount error instead of validating minimum cluster size; today it passes only because the `X` fixture is finite and no outlier labels appear"
+contract: Filter with `label not in OUTLIER_SET` (or `label >= 0`) before `bincount`.
+instances: single-instance
+
+### F4 — `test_dbscan_clustering_outlier_data` uses element-wise `+` on numpy index arrays instead of concatenation
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:212 — `clean_idx = list(set(range(200)) - set(missing_labels_idx + infinite_labels_idx))`. `missing_labels_idx` and `infinite_labels_idx` are `np.flatnonzero(...)` results (ndarrays). `+` performs element-wise/broadcast addition, not concatenation: with `missing=[2,5]` and `infinite=[0]`, the broadcast produces `[2,5]`; index `0` is then wrongly retained in `clean_idx`, so `X_outlier[clean_idx]` still contains the `[np.inf, 1]` outlier row. The test only happens to pass because `clean_model` re-labels that row as `-2` again, aligning with `labels[clean_idx]`.
+scenario: "outlier index sets grow so shapes don't broadcast → the test crashes; today the assertion at line 215 is validating a subtly wrong `clean_idx` that never actually removes the infinite-labeled sample from the 'clean' subset"
+contract: Use `np.concatenate([missing_labels_idx, infinite_labels_idx])` (or `list(missing_labels_idx) + list(infinite_labels_idx)`).
+instances: single-instance
+
+### F5 — `max_distance` parameter of `mutual_reachability_graph` is untested
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_reachability.pyx:44-46, 209-212 — `max_distance` gates the replacement value for infinite mutual-reachability distances in the sparse path: `elif max_distance > 0: data[i] = max_distance`. sklearn/cluster/_hdbscan/tests/test_reachibility.py has no test that exercises non-zero `max_distance` or that verifies infinite entries are replaced correctly. The plan explicitly relies on this behavior via `_hdbscan_brute` (hdbscan.py:243 `max_distance = metric_params.get("max_distance", 0.0)`).
+scenario: "regression that stops replacing infinite entries when `max_distance > 0` → silently returns infinite mutual-reachability distances, corrupting MST construction; no test catches this"
+contract: Add a sparse-input test with infinite-would-be mutual-reachability values that asserts they are replaced by `max_distance` when it is set (and left as `INFINITY` when it is 0).
+instances: single-instance
+
+### F6 — `max_cluster_size` and `cluster_selection_method="leaf"` are untested public parameters
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:443-446 documents `max_cluster_size`, and hdbscan.py:492-497 documents `cluster_selection_method={"eom", "leaf"}`. Grep of sklearn/cluster/tests/test_hdbscan.py shows `max_cluster_size` never appears and `cluster_selection_method` only appears as `"eom"` (lines 340, 354). The `"leaf"` selection path in `_get_clusters` and `max_cluster_size` gating in `_condense_tree`/`_get_clusters` are consequently untested new behavior.
+scenario: "regression in the leaf-selection path or in the max_cluster_size gating → shipped estimator produces wrong labels for those settings; no test detects it"
+contract: Add coverage that fits with `cluster_selection_method="leaf"` and with `max_cluster_size` set to a value that meaningfully changes clustering, asserting expected labels.
+instances: single-instance
+
+### F7 — `test_hdbscan_algorithms` first assertion ignores the parametrized `metric`
+severity: low
+evidence: sklearn/cluster/tests/test_hdbscan.py:136-145 — the test is `@pytest.mark.parametrize("metric", _VALID_METRICS)` yet line 143 calls `HDBSCAN(algorithm=algo).fit_predict(X)` with the default `metric="euclidean"`, then asserts `n_clusters == n_clusters_true`. This assertion runs identically for every `metric` value, so the parametrization does not verify anything about the metric for that portion of the test — the metric is only used after the early return on line 149.
+scenario: "regression in a non-euclidean metric path → early per-metric assertion still passes because it silently uses euclidean"
+contract: Move the `n_clusters == n_clusters_true` block after the `metric` is applied so it actually exercises the parametrized metric.
+instances: single-instance
+
+### F8 — `test_hdbscan_algorithms` invalid-metric branch relies on bare `pytest.raises(ValueError)` and cannot distinguish parameter validation from algorithm-metric mismatch
+severity: low
+evidence: sklearn/cluster/tests/test_hdbscan.py:168-170 — `with pytest.raises(ValueError): hdb.fit(X)` has no `match=` argument. HDBSCAN's `_parameter_constraints` (hdbscan.py:626) restricts `metric` to `FAST_METRICS | {"precomputed"}` (plus callable), so many `_VALID_METRICS` entries raise `InvalidParameterError` (a `ValueError` subclass) at `_validate_params`, before the intended KDTree/BallTree metric-validity check at hdbscan.py:772-783 ever runs. The test conflates two different code paths.
+scenario: "the specific 'not a valid metric for a KDTree-based algorithm' rejection breaks or moves → test still passes because InvalidParameterError from `_validate_params` masks the change"
+contract: Add `match=` matching the specific "is not a valid metric for a .*-based algorithm" message from hdbscan.py:774/781.
+instances: single-instance
+
+### F9 — `remap_single_linkage_tree` and `_get_finite_row_indices` have no direct tests
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:351-407 defines both helpers; grep across `sklearn/cluster/tests/test_hdbscan.py` and `sklearn/cluster/_hdbscan/tests/test_reachibility.py` shows neither symbol is imported or referenced. Their behavior is only exercised transitively through outlier fitting tests, so an off-by-one or index-remap regression could silently pass end-to-end tests that only count clusters.
+scenario: "logic change in remap_single_linkage_tree that mis-indexes a single point → transitive tests still pass counts/labels-of-outlier checks; the internal `_single_linkage_tree_` structure is not verified"
+contract: Add unit tests that construct a small tree with known non-finite indices and assert the exact structure of the remapped tree.
+instances: single-instance
+
+### F10 — `HDBSCAN(n_jobs=4)` default contradicts documented `n_jobs=None` default and is untested [out-of-theme]
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:658 sets `n_jobs=4` in `__init__`, while the docstring at hdbscan.py:486-490 documents "n_jobs : int, default=None. `None` means 1 unless in a `joblib.parallel_backend` context." No test in test_hdbscan.py references `n_jobs`, so this docstring/default mismatch is neither caught by tests nor detected by an "estimator matches docstring defaults" check.
+scenario: "user reads docs expecting sequential default → gets 4-worker parallelism, potentially oversubscribing when nested in joblib; no test surfaces the discrepancy"
+contract: Change the default to `None` to match the documented contract (and add a test asserting the constructor default equals the documented default).
+instances: single-instance

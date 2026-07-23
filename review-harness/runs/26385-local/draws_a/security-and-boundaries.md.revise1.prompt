@@ -1,0 +1,123 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+security-and-boundaries.md F6: hedged contract ('either ... or'); pin ONE recommendation
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+Now I've gathered sufficient context. Producing the security-and-boundaries findings document. This code is scikit-learn HDBSCAN — a legitimate ML clustering algorithm implementation, not malware. I only performed read-only analysis; no code augmentation was done.
+
+### F1 — `_hdbscan_prims` forwards `max_distance` to `DistanceMetric.get_metric`, causing an unexpected-keyword failure
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:344 — `dist_metric = DistanceMetric.get_metric(metric, **metric_params)` is invoked with the raw user-supplied `metric_params` dict; that same dict is documented (hdbscan.py:120–122, 174–178 of `_reachability` docstring) to carry a `max_distance` key used by the sparse mutual-reachability path. Unlike `_hdbscan_brute` (line 243), the prims path never pops/filters `max_distance` before splatting.
+scenario: "User follows the error message from `_brute_mst` and passes `metric_params={'max_distance': 10}` → later calls with a non-precomputed metric route through `_hdbscan_prims`, which forwards the key into `DistanceMetric.get_metric(...)` and dies with a `TypeError: __init__() got an unexpected keyword argument 'max_distance'`, leaking an internal-looking error from user-driven input rather than a validated boundary check."
+contract: Whitelist/strip `metric_params` keys that are HDBSCAN-only sentinels (currently `max_distance`) before forwarding them into `DistanceMetric.get_metric` and `NearestNeighbors`, so misplaced-trust in caller-supplied kwargs cannot produce cryptic downstream TypeErrors from third-party metric constructors.
+instances: single-instance
+
+### F2 — `n_jobs=4` default silently spawns worker processes without user opt-in
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:658 — `n_jobs=4` in `HDBSCAN.__init__`; the docstring at line 486–490 states "``None`` means 1 unless in a :obj:`joblib.parallel_backend` context. ``-1`` means using all processors." — implying a `None` default per scikit-learn convention, but the actual default is a hard-coded `4`.
+scenario: "A user (or a sandboxed/containerized service) instantiates `HDBSCAN()` expecting the documented default → the estimator silently spins up up to four parallel workers via `pairwise_distances`, exceeding the caller's implicit CPU/memory boundary and contradicting the documented behavior; in constrained environments (containers with `cpuset=1`, CI runners) this yields resource exhaustion the caller never authorized."
+contract: Change the default to `n_jobs=None` to match the documented contract and the rest of scikit-learn's clustering estimators, so that spawning parallel workers requires explicit caller consent.
+instances: single-instance
+
+### F3 — `metric` callable is not validated against the `precomputed`/tree paths, letting user code silently run under an incompatible algorithm
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:626 — `"metric": [StrOptions(FAST_METRICS | {"precomputed"}), callable]`; combined with lines 772–783 the callable metric is only rejected for `kdtree`/`balltree`, never for `precomputed`. In `_hdbscan_brute` at line 238–240, when `metric="precomputed"` is not selected the callable is passed through `pairwise_distances`, but the branch at line 222 uses object identity `metric == "precomputed"` — a truthy callable passed while user believes they set `precomputed` would silently bypass the symmetry check.
+scenario: "User accidentally passes a callable while intending `metric='precomputed'` (e.g., `HDBSCAN(metric=lambda X: X)`) → the symmetry / square-matrix guardrails on lines 223–234 are skipped and the callable is invoked as a pairwise-distance function on the user's precomputed matrix, silently producing wrong (or infinite-loop-inducing) distances instead of an early input-validation error."
+contract: Explicitly reject callable `metric` when the intent is a precomputed matrix, and add a positive `metric == "precomputed"` guard in `_hdbscan_brute` that raises when a non-string callable slips through.
+instances: single-instance
+
+### F4 — Recursion in `recurse_leaf_dfs` on caller-controlled tree depth risks stack overflow
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:555–566 — `recurse_leaf_dfs` recursively descends the condensed cluster tree with no depth cap: `return sum([recurse_leaf_dfs(cluster_tree, child) for child in children], [])`. The tree depth is a function of the input data shape, which is caller-supplied.
+scenario: "A malicious or pathological input dataset that produces a highly unbalanced condensed hierarchy (chain-of-clusters shape with depth ~ n_samples) → Python recursion limit is exceeded inside a `cpdef` Cython routine, raising `RecursionError` mid-fit and aborting the estimator with no graceful degradation."
+contract: Reimplement `recurse_leaf_dfs` iteratively (explicit stack/deque) so tree-descent depth is bounded by heap memory, not by Python's recursion limit.
+instances: single-instance
+
+### F5 — `TreeUnionFind.find` uses unbounded recursion for path compression
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:352–356 — `cdef cnp.intp_t find(self, cnp.intp_t x): if self.data[x, 0] != x: self.data[x, 0] = self.find(self.data[x, 0]); ...` recurses through a union-find chain whose length is bounded by the number of samples.
+scenario: "Adversarially crafted input producing a deep union chain (before path compression kicks in) → `find` recurses `O(n_samples)` deep, tripping Python/C-stack limits or CPython's recursion cap when invoked from `labelling_at_cut`/`_do_labelling`, terminating the fit with a stack overflow rather than a bounded error."
+contract: Convert `TreeUnionFind.find` to an iterative two-pass path-compression implementation so union-find operations are safe on adversarial input sizes.
+instances: single-instance
+
+### F6 — `self._raw_data = X` retains a reference to caller-owned input, defeating the `copy=False` boundary
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:707 — `self._raw_data = X` stores the validated (but not copied) input array on the estimator instance whenever `metric != "precomputed"`, regardless of `self.copy`.
+scenario: "User trains `HDBSCAN(copy=False)` on a large array and then mutates or frees the underlying buffer expecting scikit-learn to be done with it → the estimator silently keeps a live reference (via `_raw_data`), so mutations reflect into the estimator's stored state, and any later pickling of the estimator serializes the entire raw training set — an unexpected data-leak channel when the estimator is persisted or shipped between processes."
+contract: Either document `_raw_data` explicitly as a retained view of the training data (public leakage semantics) or drop the attribute after `fit` and reconstruct only what downstream methods actually need.
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record, reviewing through ONE assigned theme lens. You are one of several
+mutually-blind reviewers; do not assume anyone else will catch what you skip. Your final
+response text IS the deliverable file — output only the findings document described below.
+
+# Your theme (you OWN this axis)
+
+Theme: security-and-boundaries
+Charter: Authn/authz gaps, injection, secrets/PII exposure, unsafe input handling, and misplaced trust in caller-supplied data.
+
+Hunt this axis exhaustively across every changed file your theme could plausibly implicate.
+You must still report CRITICAL defects outside your theme that you stumble on — append
+" [out-of-theme]" to the title of any such finding. Do not pad: out-of-theme findings are
+for defects you actually verified while working your own axis.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/PLAN.md
+- Diff manifest: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/DIFF_MANIFEST.md
+- Per-file hunk diffs: /Users/dabs/Development/rh-wt-26385-local/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /Users/dabs/Development/rh-wt-26385-local
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk every changed file your theme could plausibly implicate: read its hunk diff, then
+   open the full file in the worktree and verify what the hunk implies — never trust the
+   hunk alone. `.pyx`/`.pxd` Cython files are first-class changed code; review them as
+   carefully as `.py`.
+4. Review BOTH conformance directions through your theme's lens:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+6. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+The instances line must be EXACTLY one of those two forms — no annotations after
+"single-instance". Number findings sequentially from F1. No preamble, no summary, no
+headings other than the finding blocks, no hedging ("consider possibly" is banned). If you
+genuinely verified there is nothing to report on your axis, output exactly: NO FINDINGS

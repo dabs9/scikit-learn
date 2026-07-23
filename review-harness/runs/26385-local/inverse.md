@@ -1,0 +1,86 @@
+### F1 — Plan lacks explicit sanctioning for the entire HDBSCAN implementation body
+severity: low
+scenario: "Inverse audit — Inventory A (plan requirements). The plan states three explicit 'novel changes' that were injected within this PR → all other content (the estimator implementation itself, the Cython extension modules, tests, docs, examples, `what's new`, `setup.py` wiring) is only implicitly sanctioned by the umbrella title and by reference to external merged PRs whose content the plan does not enumerate at file granularity, so the audit cannot map individual files in B back to itemized promises in A."
+contract: "A plan-of-record for a 'novel-changes-only' delta PR relies on the reviewer accepting the umbrella statement ('Add HDBSCAN as a new estimator') as blanket sanction for all supporting infrastructure. That is acceptable but should be flagged: the audit cannot map individual files in B back to itemized promises in A."
+evidence:
+- Plan PR title: "ENH Add `HDBSCAN` as a new estimator in `sklearn.cluster`" (PLAN.md:4).
+- Plan "What does this implement/fix?" section defers to the linked issue #24686 and lists only three *novel* changes (PLAN.md:11–17).
+- The mandatory-work checklist in PLAN.md:36–48 references separately-merged sub-PRs (#24857, #24701, #25768, #25826, #25827, #26011, #26096, #26101, #24698, #25538, #25134) — none of which are quoted as file-level requirements the reviewer can match against the manifest here.
+- The manifest lists 12 net-new (`A`) source/test/example files totalling >3,000 lines (DIFF_MANIFEST.md:15, 19–26, 29) that implement the estimator body itself.
+
+instances: single-instance
+
+All these fall under class (b) in the audit spec: "changes in B with NO sanctioning requirement in A" — but the plan's umbrella title functions as sanction, so they are informational rather than defective.
+
+---
+
+### F2 — Novel change #1 ("Replaced `cnp.*_t` typing with `*_t` from `_typedefs.pxd`") only partially satisfied; `_tree.pyx` still contains 107 `cnp.` occurrences
+severity: medium
+scenario: "The plan asserts a completed refactor of `cnp.*_t` → typedef `*_t` typing across the added Cython sources. The refactor is present in `_linkage.pyx` and `_reachability.pyx` (typedef imports added), but `_tree.pyx` — the largest Cython file (+797 lines) — was added without importing from `_typedefs.pxd` and continues to reference `cnp.*` extensively. The residual `cnp.` names may be `cnp.ndarray` (legitimately still needed) rather than `cnp.*_t` typedefs, but the audit cannot confirm that from the manifest alone without the reader inspecting the file."
+contract: "A 'replaced' claim in the plan should hold uniformly across all added Cython files. Uneven application weakens the inverse-conformance mapping and may indicate the claim describes a partial migration."
+evidence:
+- Plan promise: "Replaced `cnp.*_t` typing with `*_t` from `_typedefs.pxd`" (PLAN.md:15).
+- Verification of the cimport landing:
+  - `hunks/sklearn_cluster__hdbscan__linkage.pyx.diff:48` — `+from ...utils._typedefs cimport intp_t, float64_t, int64_t, uint8_t`
+  - `hunks/sklearn_cluster__hdbscan__reachability.pyx.diff:46` — `+from ...utils._typedefs cimport intp_t`
+- Residual `cnp.` occurrences (post-change) counted in the hunk diffs:
+  - `_linkage.pyx.diff`: 12
+  - `_reachability.pyx.diff`: 4
+  - `_tree.pyx.diff`: 107
+  - `_tree.pxd.diff`: 1
+- `sklearn/cluster/_hdbscan/_tree.pyx` (newly added, +797 lines per DIFF_MANIFEST.md:23) contains no `_typedefs` cimport (grep for `_typedefs` in that hunk returns no match).
+
+instances: [sklearn/cluster/_hdbscan/_tree.pyx:1, sklearn/cluster/_hdbscan/_tree.pxd:1]
+
+---
+
+### F3 — Novel change #3 ("Trimmed unused variables") corroborated only in a peripheral file, not in the newly-added HDBSCAN sources
+severity: low
+scenario: "Inverse audit — the plan's third novel change cannot be independently verified from the manifest because it applies only to added files (nothing to diff against) → this is a limitation of 'novel-changes' bookkeeping in a rebase-heavy PR, not a defect, and the plan's checklist entry (#25538 in PLAN.md:47) purportedly covers the work in a prior PR."
+contract: "For added files, 'trimmed' is unverifiable from the diff alone; the plan's checklist entry (#25538 in PLAN.md:47) purportedly covers this work in a prior PR."
+evidence:
+- Plan promise: "Trimmed unused variables (thanks to Cython linting pre-commit)" (PLAN.md:17).
+- The only *deletions* in the manifest touching Cython live in `sklearn/cluster/_hierarchical_fast.pyx` (`+0/-5`, DIFF_MANIFEST.md:28) and consist of moving `cdef` field declarations from the `.pyx` into a new `.pxd` (`sklearn/cluster/_hierarchical_fast.pxd`, +9, DIFF_MANIFEST.md:27), plus removing one blank line — this is a header-split refactor, not variable trimming.
+- All HDBSCAN-specific new files (`_linkage.pyx`, `_reachability.pyx`, `_tree.pyx`, `_tree.pxd`) are `A` (added), so any "trimming" happened pre-add and is not visible in the diff.
+
+instances: single-instance
+
+---
+
+### F4 — Manifest change to `sklearn/cluster/_hierarchical_fast.{pyx,pxd}` sanctioned by no plan item
+severity: low
+scenario: "Inverse audit class (b): a change in B without any sanctioning requirement in A → the refactor is plausibly needed as an enabler for HDBSCAN's `_linkage.pyx` (which is likely to cimport `UnionFind`) but the plan does not disclose this cross-module coupling change as one of its 'novel changes', so a reviewer cannot map the `_hierarchical_fast` edits to any itemized promise."
+contract: "The plan's 'novel changes' list should enumerate any modification to *unrelated* pre-existing modules made purely to enable the new estimator. This one is missing."
+evidence:
+- Manifest entries: `M sklearn/cluster/_hierarchical_fast.pyx +0/-5` (DIFF_MANIFEST.md:28) and `A sklearn/cluster/_hierarchical_fast.pxd +9/-0` (DIFF_MANIFEST.md:27).
+- Diff content (from `hunks/sklearn_cluster__hierarchical_fast.pyx.diff` and `hunks/sklearn_cluster__hierarchical_fast.pxd.diff`): moves `UnionFind`'s `cdef` field declarations (`next_label`, `parent`, `size`) plus `union`/`fast_find` method signatures out of the `.pyx` and into a new `.pxd` header, presumably to allow other modules (e.g., `_hdbscan/_linkage.pyx`) to `cimport UnionFind`.
+- Plan (PLAN.md:14–17) enumerates three novel changes; none mention promoting `UnionFind` fields to a public `.pxd` header, nor does the mandatory-work checklist (PLAN.md:36–48) reference `_hierarchical_fast`.
+
+instances: [sklearn/cluster/_hierarchical_fast.pyx:1, sklearn/cluster/_hierarchical_fast.pxd:1]
+
+---
+
+### F5 — Plan checklist items reference already-merged upstream PRs and cannot be matched to any file in the current manifest
+severity: low
+scenario: "Inverse audit class (a): requirements in A with no implementing change in B → however, these items are explicitly marked complete in prior PRs, so absence from *this* diff is expected and the finding is raised only to acknowledge the audit examined and dismissed them."
+contract: "A checklist of already-merged sub-PRs is not a set of requirements for the current diff; it is provenance. No action."
+evidence:
+- Plan checklist items (PLAN.md:36–48) are external PR/issue links: `#24857`, `PR#24701`, `PR#25768`, `PR#25826`, `PR#25827`, `PR#26011`, `PR#26096`, `PR#26101`, `PR#24698`, `PR#25538`, `#25134`.
+- All are marked `[x]` (completed) and describe work already merged in prior PRs; none map to a file listed in DIFF_MANIFEST.md.
+
+instances: [PLAN.md:36, PLAN.md:37, PLAN.md:38, PLAN.md:39, PLAN.md:40, PLAN.md:41, PLAN.md:42, PLAN.md:43, PLAN.md:44, PLAN.md:47, PLAN.md:48]
+
+---
+
+### F6 — Reconciliation summary
+severity: low
+scenario: "Full inventory reconciliation performed across all 19 manifest paths and all plan items → every manifest file is accounted for by either an explicit plan claim, the plan's umbrella scope, or an unsanctioned-change finding above, leaving no orphan paths."
+contract: "Every manifest file must be accounted for by an explicit plan claim, the plan's umbrella scope, or an unsanctioned-change finding above."
+evidence: All 19 manifest paths (DIFF_MANIFEST.md:6–30) accounted for as follows:
+- Sanctioned by plan umbrella title (F1): `examples/cluster/plot_hdbscan.py`, `sklearn/cluster/_hdbscan/__init__.py`, `sklearn/cluster/_hdbscan/hdbscan.py`, `sklearn/cluster/_hdbscan/tests/__init__.py`, `sklearn/cluster/_hdbscan/tests/test_reachibility.py`, `sklearn/cluster/tests/test_hdbscan.py`, `sklearn/cluster/__init__.py`, `sklearn/utils/estimator_checks.py`, `setup.py`, `examples/cluster/plot_cluster_comparison.py`, `doc/modules/classes.rst`, `doc/modules/clustering.rst`, `doc/whats_new/v1.3.rst`.
+- Sanctioned by plan novel changes #1/#2 (F2): `sklearn/cluster/_hdbscan/_linkage.pyx`, `sklearn/cluster/_hdbscan/_reachability.pyx`, `sklearn/cluster/_hdbscan/_tree.pyx`, `sklearn/cluster/_hdbscan/_tree.pxd`.
+- Unsanctioned (F4): `sklearn/cluster/_hierarchical_fast.pyx`, `sklearn/cluster/_hierarchical_fast.pxd`.
+
+Unmatched plan requirements: none beyond the historical checklist noted in F5.
+
+instances: [DIFF_MANIFEST.md:6-30]

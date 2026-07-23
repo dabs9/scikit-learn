@@ -1,0 +1,16 @@
+depth.md F243: missing scenario: "..." line
+depth.md F243: hedged contract ('either ... or'); pin ONE recommendation
+depth.md F243: malformed instances value 'sklearn/cluster/_hdbscan/hdbscan.py:352, sklearn/cluster/_hd' — the line must be EXACTLY 'instances: single-instance' (no extra text after it) or 'instances: [path/file.py:12, path/other.py:34]'
+depth.md F244: missing scenario: "..." line
+depth.md F244: malformed instances value 'sklearn/cluster/_hdbscan/hdbscan.py:759, sklearn/cluster/_hd' — the line must be EXACTLY 'instances: single-instance' (no extra text after it) or 'instances: [path/file.py:12, path/other.py:34]'
+depth.md F245: missing scenario: "..." line
+depth.md F245: hedged contract ('either ... or'); pin ONE recommendation
+depth.md F245: malformed instances value 'sklearn/cluster/_hdbscan/_reachability.pyx:41, sklearn/clust' — the line must be EXACTLY 'instances: single-instance' (no extra text after it) or 'instances: [path/file.py:12, path/other.py:34]'
+depth.md F246: missing scenario: "..." line
+depth.md F246: malformed instances value 'sklearn/cluster/_hdbscan/_tree.pyx:264, sklearn/cluster/_hdb' — the line must be EXACTLY 'instances: single-instance' (no extra text after it) or 'instances: [path/file.py:12, path/other.py:34]'
+depth.md F247: missing scenario: "..." line
+depth.md F247: malformed instances value 'doc/modules/clustering.rst:80, doc/modules/clustering.rst:13' — the line must be EXACTLY 'instances: single-instance' (no extra text after it) or 'instances: [path/file.py:12, path/other.py:34]'
+depth.md F248: missing scenario: "..." line
+depth.md F248: malformed instances value 'sklearn/cluster/_hdbscan/hdbscan.py:66, sklearn/cluster/_hdb' — the line must be EXACTLY 'instances: single-instance' (no extra text after it) or 'instances: [path/file.py:12, path/other.py:34]'
+depth.md F249: missing scenario: "..." line
+depth.md F249: malformed instances value 'sklearn/cluster/tests/test_hdbscan.py:317, sklearn/cluster/_' — the line must be EXACTLY 'instances: single-instance' (no extra text after it) or 'instances: [path/file.py:12, path/other.py:34]'

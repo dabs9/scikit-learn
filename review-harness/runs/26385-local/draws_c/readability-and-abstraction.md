@@ -1,0 +1,104 @@
+### F1 — `n_jobs` default value contradicts its documented default
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:658 — `__init__` sets `n_jobs=4`, but the class-level docstring at sklearn/cluster/_hdbscan/hdbscan.py:486-490 says "n_jobs : int, default=None" with "None means 1 unless in a :obj:`joblib.parallel_backend` context." The signature's default silently overrides that documented contract with a hard-coded 4-thread default that ignores the joblib context.
+scenario: "user relies on documented default (`None`, joblib-context aware) → HDBSCAN silently uses 4 threads regardless of joblib.parallel_backend, breaking parallelism expectations and repro parity with other estimators"
+contract: Set `n_jobs=None` in `__init__` to match the docstring and standard sklearn convention.
+instances: single-instance
+
+### F2 — Misleading remap comment claims wrong outlier labels
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:832-833 — comment reads "Samples with np.inf are mapped to -1 and those with np.nan are mapped to -2", but `_OUTLIER_ENCODING` at sklearn/cluster/_hdbscan/hdbscan.py:65-79 maps `"infinite"` → label `-2` and `"missing"` → label `-3` (noise is `-1`). The comment lies about what the very next lines do.
+scenario: "maintainer reads the comment to understand outlier remapping → gets a false model of the label scheme and may propagate the wrong contract to callers/docs"
+contract: Update the comment to reflect the actual encoding: infinite→-2, missing→-3.
+instances: single-instance
+
+### F3 — `_weighted_cluster_center` omits `-3` (missing) from noise mask
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:895 — `n_clusters = len(set(self.labels_) - {-1, -2})`. `_OUTLIER_ENCODING` defines three outlier labels (-1 noise, -2 infinite, -3 missing) per sklearn/cluster/_hdbscan/hdbscan.py:65-79 and the class docstring at line 534-537. When any input row is `np.nan`, label `-3` appears in `self.labels_` and is counted as a cluster; `centroids_`/`medoids_` will then be indexed by `idx in range(n_clusters)` and `mask = self.labels_ == idx` is entered with negative `idx`s never occurring, but `n_clusters` is inflated and trailing rows of `centroids_`/`medoids_` are left uninitialized (`np.empty`), silently returning garbage values.
+scenario: "fit data containing NaN rows with `store_centers='centroid'` → `centroids_` contains uninitialized garbage rows because `n_clusters` includes the -3 label bucket that never gets written"
+contract: Exclude every label in `_OUTLIER_ENCODING` (i.e., `{-1, -2, -3}` or `{-1} | {v['label'] for v in _OUTLIER_ENCODING.values()}`) when counting non-noise clusters.
+instances: single-instance
+
+### F4 — `remap_single_linkage_tree` is called with a `set` for an order-dependent `non_finite` argument
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:838 passes `non_finite=set(infinite_index + missing_index)`; sklearn/cluster/_hdbscan/hdbscan.py:388 iterates `for i, outlier in enumerate(non_finite)` and writes `outlier_tree[i] = (outlier, ...)`. Set iteration order is implementation-defined; the docstring at line 364-365 documents `non_finite` as a "Boolean array".
+scenario: "outlier tree rows are populated in whatever order Python's set hashing yields → tree[i]['left_node'] receives outlier point indices in nondeterministic order, and the docstring's 'Boolean array' contract is violated (a boolean array would be indexed via truthiness, not enumerated as scalar sample indices)"
+contract: Pass `np.sort(np.unique(np.concatenate([infinite_index, missing_index])))` and update the docstring to say `ndarray of sample indices`.
+instances: single-instance
+
+### F5 — Speculative/dead re-initialization of `births`
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:252 assigns `births = np.full(largest_child + 1, np.nan, dtype=np.float64)` then line 254 immediately re-assigns the identical expression. The first assignment is unused.
+scenario: "reader is misled into looking for a between-lines side effect that never exists → wastes an allocation and signals broken editing history"
+contract: Delete the duplicated allocation on line 252.
+instances: single-instance
+
+### F6 — Untyped Python-object fallthrough for `label`/`parent_lambda` in a `cdef` hot loop
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:467-508 — the `cdef:` block in `_do_labelling` declares typed locals but never declares `label` or `parent_lambda`. `label` is assigned `NOISE` (an `intp_t`) on line 492 and `cluster_label_map[cluster]` (a Python object from a `dict`) on line 494/506; `parent_lambda` on line 498 is a `cnp.ndarray` slice, compared with `>=` against a `cnp.float64_t` on line 505. Both become implicit Python objects — a lying "typed" interface: reader assumes cdef discipline but critical loop vars are boxed.
+scenario: "reader trusts the `cdef:` block as the local-var contract → misjudges hot-loop performance and mis-predicts that `parent_lambda >= threshold` compares scalars (it broadcasts and returns a numpy array whose truthiness raises for len>1)"
+contract: Add explicit `cnp.intp_t label` and `cnp.float64_t parent_lambda` to the `cdef:` block, and index the singleton array element instead of comparing an ndarray to a scalar.
+instances: single-instance
+
+### F7 — `test_hdbscan_precomputed_non_brute` asserts the wrong error path
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:277-284 — the test constructs `HDBSCAN(metric="precomputed", algorithm=f"prims_{tree}tree")` where `algorithm` is `"prims_kdtree"`/`"prims_balltree"`. Those values are not in the `StrOptions({"auto","brute","kdtree","balltree"})` constraint at sklearn/cluster/_hdbscan/hdbscan.py:629-638, so the test passes only because `_validate_params` raises `InvalidParameterError` (a `ValueError` subclass) — never exercising the intended `algorithm` vs `metric="precomputed"` incompatibility branch. The test's docstring says it verifies rejection of a tree-based algorithm with precomputed data; it actually verifies rejection of an unknown algorithm string.
+scenario: "developer removes/relaxes the algorithm-name enum → test still passes because it never reaches the metric-incompatibility check, so the actual invariant is silently unguarded"
+contract: Use the valid names `"kdtree"`/`"balltree"` in the parametrization and assert on the metric-incompatibility error message.
+instances: single-instance
+
+### F8 — `mst_from_data_matrix` initializes `current_sources` to `1` (misleading sentinel)
+severity: low
+evidence: sklearn/cluster/_hdbscan/_linkage.pyx:160 — `current_sources = np.ones(n_samples, dtype=np.int64)`. Nothing about "1" is meaningful as a source-of-source-node sentinel; before line 204 (`current_sources[j] = current_node`) writes to a slot, any read at line 179 (`next_node_source = current_sources[j]`) returns a bogus `1`. This value can then be assigned into `mst[i].current_node` via lines 197-199 if `next_node_min_reach` remains `INFTY`/other stale value. A lying name/initialization: it pretends every node's source is node 1.
+scenario: "reader auditing correctness on the first outer iteration (i=0) reads `current_sources[j]` before any write → cannot distinguish 'source=1 because we chose it' from 'source=1 because it was the fill value', obscuring the read-before-write invariant"
+contract: Initialize `current_sources` to `0` (matching the initial `current_node=0`) and document the invariant that reads only happen after a write.
+instances: single-instance
+
+### F9 — Test uses ndarray `+` for concatenation, silently exercising broadcasting
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:212 — `clean_idx = list(set(range(200)) - set(missing_labels_idx + infinite_labels_idx))`. `missing_labels_idx` and `infinite_labels_idx` come from `np.flatnonzero(...)` (lines 206/209) and are ndarrays. `ndarray + ndarray` broadcasts elementwise; with shapes `(2,)` and `(1,)` here it happens to return a length-2 array of sums, not the concatenation the reader assumes.
+scenario: "future edit changes seed or outlier layout so `missing_labels_idx` and `infinite_labels_idx` have incompatible non-broadcastable shapes → test crashes with a broadcasting error unrelated to the tested behavior; today it silently uses wrong indices in the 'clean' baseline"
+contract: Use `np.concatenate([missing_labels_idx, infinite_labels_idx])` (or `.tolist() + .tolist()`) for index-set arithmetic.
+instances: single-instance
+
+### F10 — Dead-store to `mask` before the loop
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:896 — `mask = np.empty((X.shape[0],), dtype=np.bool_)` is allocated and never read; line 908 unconditionally rebinds `mask = self.labels_ == idx` on every iteration.
+scenario: "reader assumes `mask` is being reused as a pre-allocated buffer for perf → looks for `mask[:] = ...` optimizations that don't exist"
+contract: Delete the pre-allocation.
+instances: single-instance
+
+### F11 — `p=None` passed to `NearestNeighbors` in `_hdbscan_prims`
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:339 — `NearestNeighbors(..., p=None)`. `NearestNeighbors.p` documents `float, default=2`; passing `None` is a surprising side-input that bypasses the sensible default. There is no comment explaining the intent (presumably "let `metric_params` supply p, don't double-count") — a speculative abstraction whose contract is undocumented.
+scenario: "future upgrade of `NearestNeighbors` tightens `p` validation to reject `None` → HDBSCAN breaks for every tree algorithm without a code change here"
+contract: Omit the `p=None` kwarg and let the default apply, or document the invariant tying `p` handling to `metric_params`.
+instances: single-instance
+
+### F12 — Typo-laden identifiers/docstrings: `mutual_reachibility_distance`, `simbling`, `smaler`, `reahability`, `collecteion`
+severity: low
+evidence: sklearn/cluster/_hdbscan/_reachability.pyx:127, 144, 149, 182, 206, 209, 210 (`mutual_reachibility_distance` — should be `reachability`); sklearn/cluster/_hdbscan/_tree.pyx:133 (`smaler`), :503 (`simbling`); sklearn/cluster/_hdbscan/_linkage.pyx:75-76, 137-138, 228-229 and sklearn/cluster/_hdbscan/hdbscan.py:102-103, 143-144 (`mutual-reahability`, `collecteion`). Identifiers used in nogil hot loops make `grep`-based navigation unreliable.
+scenario: "developer searches for `reachability_distance` to audit or extend the routine → misses the actual variable (`reachibility`) entirely, or has to know both spellings"
+contract: Rename the misspelled variable to `mutual_reachability_distance` and correct the doc typos.
+instances: [sklearn/cluster/_hdbscan/_reachability.pyx:127, sklearn/cluster/_hdbscan/_reachability.pyx:144, sklearn/cluster/_hdbscan/_reachability.pyx:149, sklearn/cluster/_hdbscan/_reachability.pyx:182, sklearn/cluster/_hdbscan/_reachability.pyx:206, sklearn/cluster/_hdbscan/_reachability.pyx:209, sklearn/cluster/_hdbscan/_reachability.pyx:210, sklearn/cluster/_hdbscan/_tree.pyx:133, sklearn/cluster/_hdbscan/_tree.pyx:503, sklearn/cluster/_hdbscan/_linkage.pyx:75, sklearn/cluster/_hdbscan/_linkage.pyx:76, sklearn/cluster/_hdbscan/_linkage.pyx:137, sklearn/cluster/_hdbscan/_linkage.pyx:138, sklearn/cluster/_hdbscan/_linkage.pyx:228, sklearn/cluster/_hdbscan/_linkage.pyx:229, sklearn/cluster/_hdbscan/hdbscan.py:102, sklearn/cluster/_hdbscan/hdbscan.py:103, sklearn/cluster/_hdbscan/hdbscan.py:143, sklearn/cluster/_hdbscan/hdbscan.py:144]
+
+### F13 — `plot_hdbscan.py` scale-invariance demo does not vary the data
+severity: low
+evidence: examples/cluster/plot_hdbscan.py:106-110 — the loop `for idx, scale in enumerate((1, 0.5, 3))` calls `hdb.fit(X)` and `plot(X, hdb.labels_, ..., parameters={"scale": scale})` — `X` is never multiplied by `scale`. The subplot titles claim varying scales but every panel shows the same fit on the same unscaled data. Cross-reference: the DBSCAN loop at line 87-89 correctly uses `X * scale`.
+scenario: "reader believes the three identical HDBSCAN panels evidence 'scale invariance' → the demo actually just proves determinism of `.fit` on the same input"
+contract: Fit and plot on `X * scale` (mirror the DBSCAN pattern above).
+instances: single-instance
+
+### F14 — Duplicated/near-identical `_hdbscan_brute` and `_hdbscan_prims` docstrings mis-describe parameters
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:269-327 — `_hdbscan_prims` docstring documents `metric` "must be one of the options allowed by pairwise_distances" (line 297-301), but the function actually uses `NearestNeighbors` + `DistanceMetric` (line 332-344) which have different valid-metric sets; the same docstring includes a `copy` parameter (line 313-318) that the function does not accept. Speculative-abstraction copy from `_hdbscan_brute`.
+scenario: "user picks a metric valid for `pairwise_distances` but not for `KDTree`/`BallTree` → fails; user reads about `copy` behaviour but the parameter is silently absent"
+contract: Rewrite the `_hdbscan_prims` docstring to describe only its actual parameters and the actual valid-metric constraint.
+instances: single-instance
+
+### F15 — `mst_from_mutual_reachability` starts from a hard-coded `current_node = 0` with no rationale
+severity: low
+evidence: sklearn/cluster/_hdbscan/_linkage.pyx:92 — Prim's is seeded at node 0 unconditionally; same in `mst_from_data_matrix` at line 162. No comment states that Prim's MST is invariant to the starting node (which is true for connected graphs but non-obvious to Cython readers), and there is no assertion that the graph is connected.
+scenario: "reader trying to understand seed-node semantics finds a bare magic 0 → wonders whether cluster ordering depends on it"
+contract: Add a single-line comment stating "Prim's is invariant to the starting node; we pick 0" or make the seed a named constant.
+instances: [sklearn/cluster/_hdbscan/_linkage.pyx:92, sklearn/cluster/_hdbscan/_linkage.pyx:162]

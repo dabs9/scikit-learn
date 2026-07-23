@@ -1,0 +1,76 @@
+### F1 — Dense mutual reachability graph iterates full n×n instead of exploiting symmetry
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_reachability.pyx:142-149 — the nested loop is `for i in range(n_samples): for j in range(n_samples): ... distance_matrix[i, j] = mutual_reachibility_distance`. The docstring at line 130 states "We assume that the distance matrix is symmetric." Both `[i,j]` and `[j,i]` receive the same computed `max(core[i], core[j], d[i,j])`, so every cell's value is computed twice.
+scenario: "user calls HDBSCAN with `algorithm='brute'` / precomputed dense distance matrix → O(n²) cells are visited twice, doubling the hot-path cost and doubling memory-traffic vs. iterating only `j >= i` and mirroring."
+contract: Iterate the upper triangle only (`for j in range(i, n_samples)`) and mirror the assignment to `distance_matrix[j, i]`; the loop must not do redundant work on a matrix its own docstring declares symmetric.
+instances: single-instance
+
+### F2 — `_get_finite_row_indices` densifies via `tolil()` for sparse input
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:401-404 — `matrix.tolil().data` builds a full LIL copy just to iterate row-by-row and call `np.isfinite`. For an (n_samples × n_samples) sparse CSR matrix this materializes a Python-list-of-arrays for every row before iterating.
+scenario: "user calls `fit` with a large sparse feature matrix containing any non-finite value → the code allocates a Python list of n arrays via `tolil()` and iterates them in a Python-level list-comprehension, dominating fit time and peak memory for what is essentially a per-nonzero `isfinite` reduction."
+contract: For CSR, compute per-row finiteness directly over `matrix.data`/`indptr` (e.g. `np.add.reduceat(~np.isfinite(matrix.data), indptr[:-1])` masked against empty rows) without converting to LIL and without a Python loop.
+instances: single-instance
+
+### F3 — Repeated linear scans of `condensed_tree` in Python-level BFS/leaf/traversal helpers
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:292-294 — `bfs_from_cluster_tree` does `process_queue = children[np.isin(parents, process_queue)]` inside a `while` loop, costing O(|parents|·|queue|) per iteration; sklearn/cluster/_hdbscan/_tree.pyx:562 `recurse_leaf_dfs` does `cluster_tree[cluster_tree['parent'] == current_node]['child']` inside recursion, O(|cluster_tree|) per node; sklearn/cluster/_hdbscan/_tree.pyx:586,593 `traverse_upwards` does the same for every walk step; sklearn/cluster/_hdbscan/_tree.pyx:619-621 `epsilon_search` does `children == leaf` and `distances[leaf_nodes][0]` for every leaf; sklearn/cluster/_hdbscan/_tree.pyx:729 `child_selection = (cluster_tree['parent'] == node)` runs per-node in `_get_clusters`.
+scenario: "large trees (many clusters after condensation) → each cluster-selection call becomes O(n_clusters²) scans over the condensed tree, and epsilon-search compounds it with `traverse_upwards`, causing quadratic hot-path cost during `fit`."
+contract: Build a single parent→children index (`dict[int, list[int]]`) and a child→row lookup once from `cluster_tree` before these routines and traverse via those indices; the tree helpers must not rescan the entire condensed array per visited node.
+instances: [sklearn/cluster/_hdbscan/_tree.pyx:294, sklearn/cluster/_hdbscan/_tree.pyx:562, sklearn/cluster/_hdbscan/_tree.pyx:586, sklearn/cluster/_hdbscan/_tree.pyx:593, sklearn/cluster/_hdbscan/_tree.pyx:620, sklearn/cluster/_hdbscan/_tree.pyx:729, sklearn/cluster/_hdbscan/_tree.pyx:732]
+
+### F4 — `mst_from_mutual_reachability` allocates 3 numpy arrays per MST edge
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_linkage.pyx:94-106 — inside the `for i in range(0, n_samples - 1)` loop each iteration builds `label_filter = current_labels != current_node`, `current_labels = current_labels[label_filter]`, `left = min_reachability[label_filter]`, `right = mutual_reachability[current_node][current_labels]` (fancy-indexed copy of a full row), and `min_reachability = np.minimum(left, right)` — 4-5 fresh arrays per iteration, plus a fancy-indexed gather from the full mutual_reachability row.
+scenario: "brute-force MST on n≈10^4 → ~n allocations of size O(n) each within the inner loop, producing O(n²) transient allocations and gathers even though a single pre-allocated `in_tree` mask (as used in `mst_from_data_matrix`) would compute the same result without allocations."
+contract: Refactor `mst_from_mutual_reachability` to use a persistent `in_tree` boolean mask + a single pre-allocated `min_reachability` array (mirroring `mst_from_data_matrix`), doing in-place `np.minimum` and `np.argmin` with `where=~in_tree`; the inner loop must not allocate per-iteration arrays or perform fancy-index gathers.
+instances: single-instance
+
+### F5 — `_compute_stability` re-runs `np.full(..., nan)` twice on the same buffer
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:252-254 — two consecutive statements `births = np.full(largest_child + 1, np.nan, dtype=np.float64)` allocate and initialize the array a second time before any use.
+scenario: "every `fit` call executes this dead allocation → wasted allocation/initialization of an ndarray of size `largest_child+1`."
+contract: Delete the duplicate allocation on line 252; keep only a single `np.full(...)` initialization.
+instances: single-instance
+
+### F6 — `_do_labelling` allocates `result` sized by `root_cluster` instead of `n_samples`
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:480-481 — `root_cluster = np.min(parent_array); result = np.empty(root_cluster, dtype=np.intp)`. The value `root_cluster` is the smallest parent id, which happens to equal `n_samples` because `_condense_tree` starts labeling internal nodes at `n_samples + 1` and roots at `n_samples`. Using `root_cluster` as a length is implicit coupling and hides the actual size (`n_samples`), and requires materializing `parent_array` and taking its min just to compute the output length.
+scenario: "someone changes the relabelling scheme in `_condense_tree` → `_do_labelling`'s output array silently mis-sizes, producing wrong-length `labels_`; performance-wise the code additionally scans `parent_array` for its min before doing any real work."
+contract: Compute the result length as `n_samples` explicitly (e.g. from the hierarchy shape passed through) rather than via `np.min(parent_array)`, and document the invariant that `root_cluster == n_samples`.
+instances: single-instance
+
+### F7 — `_get_clusters` scans `cluster_tree` twice per node in EOM loop
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:727-739 — for each node in `node_list` the loop computes `child_selection = (cluster_tree['parent'] == node)` (O(|cluster_tree|)) then `subtree_stability = np.sum([stability[child] for child in cluster_tree['child'][child_selection]])` (Python listcomp), and when the branch is not selected additionally calls `bfs_from_cluster_tree` which itself scans the whole `parents` array on every BFS step (see F3).
+scenario: "condensed trees with k clusters → EOM stage is O(k²) parent-array scans plus additional per-descendant scans through `bfs_from_cluster_tree`, dominating `fit` for datasets that produce many candidate clusters."
+contract: Precompute `parent → child_indices` and `parent → stability_sum` once from `cluster_tree` before the EOM loop and reuse them for every `node` iteration; avoid the per-node full-array equality mask.
+instances: single-instance
+
+### F8 — `n_jobs` default is a hard-coded `4`, ignoring joblib parallel context and per-machine CPU count
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:658 — `n_jobs=4,` in `__init__`; docstring at lines 486-490 states "`None` means 1 unless in a :obj:`joblib.parallel_backend` context. `-1` means using all processors." The default therefore contradicts the documented `None` semantics and hard-caps concurrency at 4 regardless of environment.
+scenario: "user runs on a 32-core box or inside a `joblib.parallel_backend` → HDBSCAN silently uses 4 workers rather than respecting the documented default, wasting available cores and diverging from every other scikit-learn estimator's `n_jobs=None` convention."
+contract: Set `n_jobs=None` as the default in `__init__`, matching the docstring and the sklearn-wide convention.
+instances: single-instance
+
+### F9 — `remap_single_linkage_tree` uses `tree.shape[0]` repeatedly instead of caching last row
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:385-387 — `last_cluster_id = max(tree[tree.shape[0] - 1]["left_node"], tree[tree.shape[0] - 1]["right_node"])` and `last_cluster_size = tree[tree.shape[0] - 1]["cluster_size"]` re-index the structured last row three times, and the loop above at lines 370-381 uses `tree[i]["left_node"]`/`tree[i]["right_node"]` (structured-array attribute access on every iteration, Python-slow) rather than vectorizing with `tree["left_node"]`/`tree["right_node"]` boolean masking.
+scenario: "non-finite-data path with n≈10^5 samples → the Python-level loop over `tree` and repeated structured-record attribute access dominates the remap step, which could otherwise be done with two vectorized `np.where` calls."
+contract: Cache `last = tree[-1]` once and vectorize the remap using `left = tree["left_node"]; mask = left < finite_count; left[mask] = internal_to_raw_lookup[left[mask]]; left[~mask] += outlier_count` (same for right), then assign back.
+instances: single-instance
+
+### F10 — `_dense_mutual_reachability_graph` TODO acknowledges missing `prange` — the loop runs single-threaded despite `n_jobs`
+severity: low
+evidence: sklearn/cluster/_hdbscan/_reachability.pyx:139-149 — `with nogil:` followed by plain `for i in range(n_samples)` and a `# TODO: Update w/ prange with thread count based on _openmp_effective_n_threads` comment. The user-facing `n_jobs` parameter is documented (hdbscan.py:486-490) as controlling parallelism, but this O(n²) hot path ignores it entirely.
+scenario: "user passes `n_jobs=-1` expecting the brute-force / precomputed path to parallelize mutual-reachability construction → the loop runs on a single thread, silently ignoring `n_jobs` for the dominant cost of the brute algorithm."
+contract: Replace the outer `for i` loop with `prange(n_samples, num_threads=_openmp_effective_n_threads(n_jobs))` and thread `n_jobs` through `mutual_reachability_graph`; the hot O(n²) inner path must honor the documented `n_jobs`.
+instances: single-instance
+
+### F11 — `bfs_from_hierarchy` is invoked repeatedly with the same subtree roots in `_condense_tree`
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:148,200,207,216,225 — `_condense_tree` calls `bfs_from_hierarchy(hierarchy, root)` once up front to obtain `node_list`, then inside the per-node loop calls `bfs_from_hierarchy(hierarchy, left)` and/or `bfs_from_hierarchy(hierarchy, right)` for each sub-min-cluster branch, each of which redoes a Python-level BFS that walks Python lists and allocates fresh `process_queue`/`next_queue` lists on every call.
+scenario: "hierarchies where many merges have one branch smaller than `min_cluster_size` (typical for `min_cluster_size` > 2) → the condensation runs BFS from thousands of internal nodes, each walking a Python-list queue with per-iteration `[x - n_samples for x in process_queue if x >= n_samples]` comprehensions, making condensation super-linear in n."
+contract: Replace `bfs_from_hierarchy` with a preallocated intp buffer + integer head/tail indices (or an iterative stack traversal in Cython) so each BFS visits O(subtree_size) with no Python list churn; ensure the top-level `node_list` traversal shares this scratch buffer.
+instances: single-instance

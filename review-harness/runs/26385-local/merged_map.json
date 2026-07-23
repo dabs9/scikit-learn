@@ -1,0 +1,970 @@
+{
+ "F1": {
+  "theme": "logic-and-correctness",
+  "original_id": "F1"
+ },
+ "F2": {
+  "theme": "logic-and-correctness",
+  "original_id": "F2"
+ },
+ "F3": {
+  "theme": "logic-and-correctness",
+  "original_id": "F3"
+ },
+ "F4": {
+  "theme": "logic-and-correctness",
+  "original_id": "F4"
+ },
+ "F5": {
+  "theme": "logic-and-correctness",
+  "original_id": "F5"
+ },
+ "F6": {
+  "theme": "logic-and-correctness",
+  "original_id": "F6"
+ },
+ "F7": {
+  "theme": "logic-and-correctness",
+  "original_id": "F7"
+ },
+ "F8": {
+  "theme": "logic-and-correctness",
+  "original_id": "F8"
+ },
+ "F9": {
+  "theme": "logic-and-correctness",
+  "original_id": "F9"
+ },
+ "F10": {
+  "theme": "logic-and-correctness",
+  "original_id": "F10"
+ },
+ "F11": {
+  "theme": "logic-and-correctness",
+  "original_id": "F11"
+ },
+ "F12": {
+  "theme": "logic-and-correctness",
+  "original_id": "F12"
+ },
+ "F13": {
+  "theme": "logic-and-correctness",
+  "original_id": "F13"
+ },
+ "F14": {
+  "theme": "logic-and-correctness",
+  "original_id": "F14"
+ },
+ "F15": {
+  "theme": "logic-and-correctness",
+  "original_id": "F15"
+ },
+ "F16": {
+  "theme": "logic-and-correctness",
+  "original_id": "F16"
+ },
+ "F17": {
+  "theme": "logic-and-correctness",
+  "original_id": "F17"
+ },
+ "F18": {
+  "theme": "logic-and-correctness",
+  "original_id": "F18"
+ },
+ "F19": {
+  "theme": "logic-and-correctness",
+  "original_id": "F19"
+ },
+ "F20": {
+  "theme": "security-and-boundaries",
+  "original_id": "F1"
+ },
+ "F21": {
+  "theme": "security-and-boundaries",
+  "original_id": "F2"
+ },
+ "F22": {
+  "theme": "security-and-boundaries",
+  "original_id": "F3"
+ },
+ "F23": {
+  "theme": "security-and-boundaries",
+  "original_id": "F4"
+ },
+ "F24": {
+  "theme": "security-and-boundaries",
+  "original_id": "F5"
+ },
+ "F25": {
+  "theme": "security-and-boundaries",
+  "original_id": "F6"
+ },
+ "F26": {
+  "theme": "security-and-boundaries",
+  "original_id": "F7"
+ },
+ "F27": {
+  "theme": "security-and-boundaries",
+  "original_id": "F8"
+ },
+ "F28": {
+  "theme": "security-and-boundaries",
+  "original_id": "F9"
+ },
+ "F29": {
+  "theme": "security-and-boundaries",
+  "original_id": "F10"
+ },
+ "F30": {
+  "theme": "security-and-boundaries",
+  "original_id": "F11"
+ },
+ "F31": {
+  "theme": "security-and-boundaries",
+  "original_id": "F12"
+ },
+ "F32": {
+  "theme": "security-and-boundaries",
+  "original_id": "F13"
+ },
+ "F33": {
+  "theme": "security-and-boundaries",
+  "original_id": "F14"
+ },
+ "F34": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F1"
+ },
+ "F35": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F2"
+ },
+ "F36": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F3"
+ },
+ "F37": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F4"
+ },
+ "F38": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F5"
+ },
+ "F39": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F6"
+ },
+ "F40": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F7"
+ },
+ "F41": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F8"
+ },
+ "F42": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F9"
+ },
+ "F43": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F10"
+ },
+ "F44": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F11"
+ },
+ "F45": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F12"
+ },
+ "F46": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F13"
+ },
+ "F47": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F14"
+ },
+ "F48": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F15"
+ },
+ "F49": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F16"
+ },
+ "F50": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F17"
+ },
+ "F51": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F18"
+ },
+ "F52": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F19"
+ },
+ "F53": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F20"
+ },
+ "F54": {
+  "theme": "tests-and-verification",
+  "original_id": "F1"
+ },
+ "F55": {
+  "theme": "tests-and-verification",
+  "original_id": "F2"
+ },
+ "F56": {
+  "theme": "tests-and-verification",
+  "original_id": "F3"
+ },
+ "F57": {
+  "theme": "tests-and-verification",
+  "original_id": "F4"
+ },
+ "F58": {
+  "theme": "tests-and-verification",
+  "original_id": "F5"
+ },
+ "F59": {
+  "theme": "tests-and-verification",
+  "original_id": "F6"
+ },
+ "F60": {
+  "theme": "tests-and-verification",
+  "original_id": "F7"
+ },
+ "F61": {
+  "theme": "tests-and-verification",
+  "original_id": "F8"
+ },
+ "F62": {
+  "theme": "tests-and-verification",
+  "original_id": "F9"
+ },
+ "F63": {
+  "theme": "tests-and-verification",
+  "original_id": "F10"
+ },
+ "F64": {
+  "theme": "tests-and-verification",
+  "original_id": "F11"
+ },
+ "F65": {
+  "theme": "tests-and-verification",
+  "original_id": "F12"
+ },
+ "F66": {
+  "theme": "tests-and-verification",
+  "original_id": "F13"
+ },
+ "F67": {
+  "theme": "tests-and-verification",
+  "original_id": "F14"
+ },
+ "F68": {
+  "theme": "tests-and-verification",
+  "original_id": "F15"
+ },
+ "F69": {
+  "theme": "tests-and-verification",
+  "original_id": "F16"
+ },
+ "F70": {
+  "theme": "tests-and-verification",
+  "original_id": "F17"
+ },
+ "F71": {
+  "theme": "tests-and-verification",
+  "original_id": "F18"
+ },
+ "F72": {
+  "theme": "tests-and-verification",
+  "original_id": "F19"
+ },
+ "F73": {
+  "theme": "tests-and-verification",
+  "original_id": "F20"
+ },
+ "F74": {
+  "theme": "tests-and-verification",
+  "original_id": "F21"
+ },
+ "F75": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F1"
+ },
+ "F76": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F2"
+ },
+ "F77": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F3"
+ },
+ "F78": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F4"
+ },
+ "F79": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F5"
+ },
+ "F80": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F6"
+ },
+ "F81": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F7"
+ },
+ "F82": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F8"
+ },
+ "F83": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F9"
+ },
+ "F84": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F10"
+ },
+ "F85": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F11"
+ },
+ "F86": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F12"
+ },
+ "F87": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F13"
+ },
+ "F88": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F14"
+ },
+ "F89": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F15"
+ },
+ "F90": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F16"
+ },
+ "F91": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F17"
+ },
+ "F92": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F18"
+ },
+ "F93": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F19"
+ },
+ "F94": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F20"
+ },
+ "F95": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F21"
+ },
+ "F96": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F22"
+ },
+ "F97": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F23"
+ },
+ "F98": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F24"
+ },
+ "F99": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F1"
+ },
+ "F100": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F2"
+ },
+ "F101": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F3"
+ },
+ "F102": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F4"
+ },
+ "F103": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F5"
+ },
+ "F104": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F6"
+ },
+ "F105": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F7"
+ },
+ "F106": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F8"
+ },
+ "F107": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F9"
+ },
+ "F108": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F10"
+ },
+ "F109": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F11"
+ },
+ "F110": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F12"
+ },
+ "F111": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F13"
+ },
+ "F112": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F14"
+ },
+ "F113": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F15"
+ },
+ "F114": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F16"
+ },
+ "F115": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F17"
+ },
+ "F116": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F1"
+ },
+ "F117": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F2"
+ },
+ "F118": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F3"
+ },
+ "F119": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F4"
+ },
+ "F120": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F5"
+ },
+ "F121": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F6"
+ },
+ "F122": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F7"
+ },
+ "F123": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F8"
+ },
+ "F124": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F9"
+ },
+ "F125": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F10"
+ },
+ "F126": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F11"
+ },
+ "F127": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F12"
+ },
+ "F128": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F13"
+ },
+ "F129": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F14"
+ },
+ "F130": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F1"
+ },
+ "F131": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F2"
+ },
+ "F132": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F3"
+ },
+ "F133": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F4"
+ },
+ "F134": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F5"
+ },
+ "F135": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F6"
+ },
+ "F136": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F7"
+ },
+ "F137": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F8"
+ },
+ "F138": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F9"
+ },
+ "F139": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F10"
+ },
+ "F140": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F11"
+ },
+ "F141": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F12"
+ },
+ "F142": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F13"
+ },
+ "F143": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F14"
+ },
+ "F144": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F15"
+ },
+ "F145": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F16"
+ },
+ "F146": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F17"
+ },
+ "F147": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F18"
+ },
+ "F148": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F19"
+ },
+ "F149": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F20"
+ },
+ "F150": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F21"
+ },
+ "F151": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F22"
+ },
+ "F152": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F23"
+ },
+ "F153": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F24"
+ },
+ "F154": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F25"
+ },
+ "F155": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F26"
+ },
+ "F156": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F27"
+ },
+ "F157": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F28"
+ },
+ "F158": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F29"
+ },
+ "F159": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F30"
+ },
+ "F160": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F31"
+ },
+ "F161": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F32"
+ },
+ "F162": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F33"
+ },
+ "F163": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F34"
+ },
+ "F164": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F35"
+ },
+ "F165": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F36"
+ },
+ "F166": {
+  "theme": "docs-and-comments",
+  "original_id": "F1"
+ },
+ "F167": {
+  "theme": "docs-and-comments",
+  "original_id": "F2"
+ },
+ "F168": {
+  "theme": "docs-and-comments",
+  "original_id": "F3"
+ },
+ "F169": {
+  "theme": "docs-and-comments",
+  "original_id": "F4"
+ },
+ "F170": {
+  "theme": "docs-and-comments",
+  "original_id": "F5"
+ },
+ "F171": {
+  "theme": "docs-and-comments",
+  "original_id": "F6"
+ },
+ "F172": {
+  "theme": "docs-and-comments",
+  "original_id": "F7"
+ },
+ "F173": {
+  "theme": "docs-and-comments",
+  "original_id": "F8"
+ },
+ "F174": {
+  "theme": "docs-and-comments",
+  "original_id": "F9"
+ },
+ "F175": {
+  "theme": "docs-and-comments",
+  "original_id": "F10"
+ },
+ "F176": {
+  "theme": "docs-and-comments",
+  "original_id": "F11"
+ },
+ "F177": {
+  "theme": "docs-and-comments",
+  "original_id": "F12"
+ },
+ "F178": {
+  "theme": "docs-and-comments",
+  "original_id": "F13"
+ },
+ "F179": {
+  "theme": "docs-and-comments",
+  "original_id": "F14"
+ },
+ "F180": {
+  "theme": "docs-and-comments",
+  "original_id": "F15"
+ },
+ "F181": {
+  "theme": "docs-and-comments",
+  "original_id": "F16"
+ },
+ "F182": {
+  "theme": "docs-and-comments",
+  "original_id": "F17"
+ },
+ "F183": {
+  "theme": "docs-and-comments",
+  "original_id": "F18"
+ },
+ "F184": {
+  "theme": "docs-and-comments",
+  "original_id": "F19"
+ },
+ "F185": {
+  "theme": "docs-and-comments",
+  "original_id": "F20"
+ },
+ "F186": {
+  "theme": "docs-and-comments",
+  "original_id": "F21"
+ },
+ "F187": {
+  "theme": "docs-and-comments",
+  "original_id": "F22"
+ },
+ "F188": {
+  "theme": "docs-and-comments",
+  "original_id": "F23"
+ },
+ "F189": {
+  "theme": "docs-and-comments",
+  "original_id": "F24"
+ },
+ "F190": {
+  "theme": "docs-and-comments",
+  "original_id": "F25"
+ },
+ "F191": {
+  "theme": "docs-and-comments",
+  "original_id": "F26"
+ },
+ "F192": {
+  "theme": "docs-and-comments",
+  "original_id": "F27"
+ },
+ "F193": {
+  "theme": "docs-and-comments",
+  "original_id": "F28"
+ },
+ "F194": {
+  "theme": "docs-and-comments",
+  "original_id": "F29"
+ },
+ "F195": {
+  "theme": "docs-and-comments",
+  "original_id": "F30"
+ },
+ "F196": {
+  "theme": "docs-and-comments",
+  "original_id": "F31"
+ },
+ "F197": {
+  "theme": "docs-and-comments",
+  "original_id": "F32"
+ },
+ "F198": {
+  "theme": "docs-and-comments",
+  "original_id": "F33"
+ },
+ "F199": {
+  "theme": "data-access-and-performance",
+  "original_id": "F1"
+ },
+ "F200": {
+  "theme": "data-access-and-performance",
+  "original_id": "F2"
+ },
+ "F201": {
+  "theme": "data-access-and-performance",
+  "original_id": "F3"
+ },
+ "F202": {
+  "theme": "data-access-and-performance",
+  "original_id": "F4"
+ },
+ "F203": {
+  "theme": "data-access-and-performance",
+  "original_id": "F5"
+ },
+ "F204": {
+  "theme": "data-access-and-performance",
+  "original_id": "F6"
+ },
+ "F205": {
+  "theme": "data-access-and-performance",
+  "original_id": "F7"
+ },
+ "F206": {
+  "theme": "data-access-and-performance",
+  "original_id": "F8"
+ },
+ "F207": {
+  "theme": "data-access-and-performance",
+  "original_id": "F9"
+ },
+ "F208": {
+  "theme": "data-access-and-performance",
+  "original_id": "F10"
+ },
+ "F209": {
+  "theme": "data-access-and-performance",
+  "original_id": "F11"
+ },
+ "F210": {
+  "theme": "data-access-and-performance",
+  "original_id": "F12"
+ },
+ "F211": {
+  "theme": "data-access-and-performance",
+  "original_id": "F13"
+ },
+ "F212": {
+  "theme": "data-access-and-performance",
+  "original_id": "F14"
+ },
+ "F213": {
+  "theme": "data-access-and-performance",
+  "original_id": "F15"
+ },
+ "F214": {
+  "theme": "data-access-and-performance",
+  "original_id": "F16"
+ },
+ "F215": {
+  "theme": "data-access-and-performance",
+  "original_id": "F17"
+ },
+ "F216": {
+  "theme": "data-access-and-performance",
+  "original_id": "F18"
+ },
+ "F217": {
+  "theme": "data-access-and-performance",
+  "original_id": "F19"
+ },
+ "F218": {
+  "theme": "data-access-and-performance",
+  "original_id": "F20"
+ },
+ "F219": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F1"
+ },
+ "F220": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F2"
+ },
+ "F221": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F3"
+ },
+ "F222": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F4"
+ },
+ "F223": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F5"
+ },
+ "F224": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F6"
+ },
+ "F225": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F7"
+ },
+ "F226": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F8"
+ },
+ "F227": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F9"
+ },
+ "F228": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F10"
+ },
+ "F229": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F11"
+ },
+ "F230": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F12"
+ },
+ "F231": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F13"
+ },
+ "F232": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F14"
+ },
+ "F233": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F15"
+ },
+ "F234": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F1"
+ },
+ "F235": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F2"
+ },
+ "F236": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F3"
+ },
+ "F237": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F4"
+ },
+ "F238": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F5"
+ },
+ "F239": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F6"
+ },
+ "F240": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F7"
+ },
+ "F241": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F8"
+ },
+ "F242": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F9"
+ }
+}

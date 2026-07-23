@@ -1,0 +1,282 @@
+[harness 02:39:53] stage 0: inputs
+Preparing worktree (detached HEAD 04c8b6954e)
+fatal: '/Users/dabs/Development/rh-wt-26385-local' is a missing but already registered worktree;
+use 'add -f' to override, or 'prune' or 'remove' to clear
+[harness 02:39:53] FATAL: worktree add failed
+[harness 02:40:36] stage 0: inputs
+Preparing worktree (detached HEAD 04c8b6954e)
+HEAD is now at 04c8b6954e Updated documentation to explicitly include example
+manifest: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/DIFF_MANIFEST.md (19 files, +3297/-10)
+hunks: /Users/dabs/Development/rh-wt-26385-local/hunks (19 diffs)
+[harness 02:40:38] stage 1a: 12 theme draws (wave a)
+[harness 02:42:10] lint violations (draw_a_security-and-boundaries, revision 1)
+[harness 02:43:07] lint violations (draw_a_module-boundaries-and-placement, revision 1)
+[harness 02:43:37] lint violations (draw_a_readability-and-abstraction, revision 1)
+[harness 02:43:51] lint violations (draw_a_build-config-and-operational-wiring, revision 1)
+[harness 02:44:14] lint violations (draw_a_docs-and-comments, revision 1)
+[harness 02:44:18] lint violations (draw_a_concurrency-async-and-error-paths, revision 1)
+[harness 02:44:33] lint violations (draw_a_tests-and-verification, revision 1)
+[harness 02:45:03] lint violations (draw_a_duplication-and-single-sourcing, revision 1)
+[harness 02:46:05] stage 1b: 12 theme draws (wave b)
+[harness 02:47:59] lint violations (draw_b_data-access-and-performance, revision 1)
+[harness 02:48:47] lint violations (draw_b_duplication-and-single-sourcing, revision 1)
+[harness 02:48:59] lint violations (draw_b_docs-and-comments, revision 1)
+[harness 02:49:03] lint violations (draw_b_concurrency-async-and-error-paths, revision 1)
+[harness 02:49:30] lint violations (draw_b_module-boundaries-and-placement, revision 1)
+[harness 02:49:31] lint violations (draw_b_dead-code-and-change-hygiene, revision 1)
+[harness 02:49:38] lint violations (draw_b_readability-and-abstraction, revision 1)
+[harness 02:49:48] lint violations (draw_b_type-and-interface-contracts, revision 1)
+[harness 02:50:27] lint violations (draw_b_logic-and-correctness, revision 1)
+[harness 02:50:58] lint violations (draw_b_readability-and-abstraction, revision 2)
+[harness 02:51:55] lint violations (draw_b_build-config-and-operational-wiring, revision 1)
+[harness 02:52:24] lint violations (draw_b_readability-and-abstraction, revision 3)
+[harness 02:53:46] lint still dirty after 3 revisions: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/draws_b/readability-and-abstraction.md
+readability-and-abstraction.md F8: evidence has no file:line anchor
+[harness 02:53:46] FATAL: stage 1b: at least one draw seat failed (no silent partial results)
+[harness 02:55:08] skip stage 0 (marker)
+[harness 02:55:08] skip stage 1a (marker)
+[harness 02:55:08] stage 1b: 12 theme draws (wave b)
+[harness 02:55:08] skip draw_b_logic-and-correctness (marker)
+[harness 02:55:08] skip draw_b_security-and-boundaries (marker)
+[harness 02:55:08] skip draw_b_concurrency-async-and-error-paths (marker)
+[harness 02:55:08] skip draw_b_tests-and-verification (marker)
+[harness 02:55:08] skip draw_b_type-and-interface-contracts (marker)
+[harness 02:55:08] skip draw_b_duplication-and-single-sourcing (marker)
+[harness 02:55:08] skip draw_b_dead-code-and-change-hygiene (marker)
+[harness 02:55:08] skip draw_b_readability-and-abstraction (marker)
+[harness 02:55:08] skip draw_b_docs-and-comments (marker)
+[harness 02:55:08] skip draw_b_module-boundaries-and-placement (marker)
+[harness 02:55:08] skip draw_b_data-access-and-performance (marker)
+[harness 02:55:08] skip draw_b_build-config-and-operational-wiring (marker)
+[harness 02:55:08] stage 1c: 12 theme draws (wave c)
+[harness 02:57:20] lint violations (draw_c_data-access-and-performance, revision 1)
+[harness 02:58:20] lint violations (draw_c_docs-and-comments, revision 1)
+[harness 02:58:23] lint violations (draw_c_module-boundaries-and-placement, revision 1)
+[harness 02:58:28] lint violations (draw_c_readability-and-abstraction, revision 1)
+[harness 02:58:53] lint violations (draw_c_type-and-interface-contracts, revision 1)
+[harness 02:59:11] lint violations (draw_c_tests-and-verification, revision 1)
+[harness 02:59:18] lint violations (draw_c_build-config-and-operational-wiring, revision 1)
+[harness 02:59:51] lint violations (draw_c_duplication-and-single-sourcing, revision 1)
+[harness 02:59:59] lint violations (draw_c_logic-and-correctness, revision 1)
+[harness 03:01:27] stage 2: 12 per-theme union merges (parallel)
+[harness 03:02:26] theme build-config-and-operational-wiring merged: 9 findings (max single draw: 6)
+[harness 03:02:43] theme dead-code-and-change-hygiene merged: 14 findings (max single draw: 11)
+[harness 03:02:59] theme data-access-and-performance merged: 20 findings (max single draw: 14)
+[harness 03:03:00] theme module-boundaries-and-placement merged: 15 findings (max single draw: 8)
+[harness 03:03:04] theme security-and-boundaries merged: 14 findings (max single draw: 7)
+[harness 03:03:10] theme logic-and-correctness merged: 19 findings (max single draw: 12)
+[harness 03:03:15] theme tests-and-verification merged: 21 findings (max single draw: 13)
+[harness 03:03:32] theme concurrency-async-and-error-paths merged: 20 findings (max single draw: 12)
+[harness 03:03:43] theme type-and-interface-contracts merged: 24 findings (max single draw: 13)
+[harness 03:04:07] theme duplication-and-single-sourcing merged: 17 findings (max single draw: 11)
+[harness 03:04:19] theme docs-and-comments merged: 33 findings (max single draw: 22)
+[harness 03:04:24] theme readability-and-abstraction merged: 36 findings (max single draw: 20)
+merged_all.md: 242 findings from 12 themes
+[harness 03:04:24] stage 3: depth (add-only strengthening)
+[harness 03:08:20] depth violations (try 1)
+[harness 03:13:05] depth violations (try 2)
+[harness 03:17:54] stage 3 could not produce a valid add-only doc in 3 tries; falling back to merged_all.md verbatim
+[harness 03:17:54] depth findings: 242
+[harness 03:17:54] stage 4: rule closure sweep
+[harness 03:21:47] stage 5: inverse conformance
+[harness 03:23:21] lint violations (inverse, revision 1)
+[harness 03:24:12] lint violations (inverse, revision 2)
+[harness 03:25:00] stage 6+7: synthesis + fidelity audit
+[harness 03:35:56] fidelity audit violations (try 1)
+PRESERVATION: unit U1 lost all evidence anchors of member D:F77
+PRESERVATION: unit U100 lost all evidence anchors of member D:F143
+PRESERVATION: unit U101 lost all evidence anchors of member D:F144
+PRESERVATION: unit U102 lost all evidence anchors of member D:F145
+PRESERVATION: unit U103 lost all evidence anchors of member D:F147
+PRESERVATION: unit U104 lost all evidence anchors of member D:F148
+PRESERVATION: unit U105 lost all evidence anchors of member D:F150
+PRESERVATION: unit U106 lost all evidence anchors of member D:F151
+PRESERVATION: unit U107 lost all evidence anchors of member D:F152
+PRESERVATION: unit U108 lost all evidence anchors of member D:F153
+PRESERVATION: unit U109 lost all evidence anchors of member D:F157
+PRESERVATION: unit U11 lost all evidence anchors of member D:F42
+PRESERVATION: unit U11 lost all evidence anchors of member D:F43
+PRESERVATION: unit U11 lost all evidence anchors of member D:F53
+PRESERVATION: unit U110 lost all evidence anchors of member D:F158
+PRESERVATION: unit U111 lost all evidence anchors of member D:F159
+PRESERVATION: unit U112 lost all evidence anchors of member D:F160
+PRESERVATION: unit U113 lost all evidence anchors of member D:F161
+PRESERVATION: unit U114 lost all evidence anchors of member D:F162
+PRESERVATION: unit U115 lost all evidence anchors of member D:F163
+PRESERVATION: unit U116 lost all evidence anchors of member D:F164
+PRESERVATION: unit U117 lost all evidence anchors of member D:F165
+PRESERVATION: unit U118 lost all evidence anchors of member D:F168
+PRESERVATION: unit U119 lost all evidence anchors of member D:F169
+PRESERVATION: unit U120 lost all evidence anchors of member D:F171
+PRESERVATION: unit U121 lost all evidence anchors of member D:F173
+PRESERVATION: unit U122 lost all evidence anchors of member D:F174
+PRESERVATION: unit U123 lost all evidence anchors of member D:F175
+PRESERVATION: unit U124 lost all evidence anchors of member D:F176
+PRESERVATION: unit U125 lost all evidence anchors of member D:F177
+PRESERVATION: unit U126 lost all evidence anchors of member D:F178
+PRESERVATION: unit U127 lost all evidence anchors of member D:F179
+PRESERVATION: unit U128 lost all evidence anchors of member D:F180
+PRESERVATION: unit U129 lost all evidence anchors of member D:F182
+PRESERVATION: unit U130 lost all evidence anchors of member D:F183
+PRESERVATION: unit U131 lost all evidence anchors of member D:F184
+PRESERVATION: unit U132 lost all evidence anchors of member D:F185
+PRESERVATION: unit U133 lost all evidence anchors of member D:F187
+PRESERVATION: unit U134 lost all evidence anchors of member D:F188
+PRESERVATION: unit U135 lost all evidence anchors of member D:F189
+PRESERVATION: unit U136 lost all evidence anchors of member D:F190
+PRESERVATION: unit U137 lost all evidence anchors of member D:F191
+PRESERVATION: unit U138 lost all evidence anchors of member D:F192
+PRESERVATION: unit U139 lost all evidence anchors of member D:F193
+PRESERVATION: unit U140 lost all evidence anchors of member D:F194
+PRESERVATION: unit U141 lost all evidence anchors of member D:F195
+PRESERVATION: unit U142 lost all evidence anchors of member D:F196
+PRESERVATION: unit U143 lost all evidence anchors of member D:F197
+PRESERVATION: unit U144 lost all evidence anchors of member D:F198
+PRESERVATION: unit U145 lost all evidence anchors of member D:F199
+PRESERVATION: unit U146 lost all evidence anchors of member D:F200
+PRESERVATION: unit U147 lost all evidence anchors of member D:F201
+PRESERVATION: unit U148 lost all evidence anchors of member D:F202
+PRESERVATION: unit U149 lost all evidence anchors of member D:F203
+PRESERVATION: unit U150 lost all evidence anchors of member D:F204
+PRESERVATION: unit U151 lost all evidence anchors of member D:F205
+PRESERVATION: unit U152 lost all evidence anchors of member D:F206
+PRESERVATION: unit U153 lost all evidence anchors of member D:F207
+PRESERVATION: unit U154 lost all evidence anchors of member D:F208
+PRESERVATION: unit U155 lost all evidence anchors of member D:F210
+PRESERVATION: unit U156 lost all evidence anchors of member D:F212
+PRESERVATION: unit U157 lost all evidence anchors of member D:F214
+PRESERVATION: unit U158 lost all evidence anchors of member D:F215
+PRESERVATION: unit U159 lost all evidence anchors of member D:F216
+PRESERVATION: unit U160 lost all evidence anchors of member D:F217
+PRESERVATION: unit U161 lost all evidence anchors of member D:F218
+PRESERVATION: unit U162 lost all evidence anchors of member D:F219
+PRESERVATION: unit U163 lost all evidence anchors of member D:F220
+PRESERVATION: unit U164 lost all evidence anchors of member D:F222
+PRESERVATION: unit U165 lost all evidence anchors of member D:F223
+PRESERVATION: unit U166 lost all evidence anchors of member D:F224
+PRESERVATION: unit U167 lost all evidence anchors of member D:F227
+PRESERVATION: unit U168 lost all evidence anchors of member D:F228
+PRESERVATION: unit U169 lost all evidence anchors of member D:F229
+PRESERVATION: unit U170 lost all evidence anchors of member D:F230
+PRESERVATION: unit U171 lost all evidence anchors of member D:F231
+PRESERVATION: unit U172 lost all evidence anchors of member D:F232
+PRESERVATION: unit U173 lost all evidence anchors of member D:F233
+PRESERVATION: unit U174 lost all evidence anchors of member D:F238
+PRESERVATION: unit U175 lost all evidence anchors of member D:F239
+PRESERVATION: unit U176 lost all evidence anchors of member D:F241
+PRESERVATION: unit U177 lost all evidence anchors of member D:F242
+PRESERVATION: unit U2 merge group size 7 > 6
+PRESERVATION: unit U2 lost all evidence anchors of member D:F167
+PRESERVATION: unit U21 lost all evidence anchors of member D:F18
+PRESERVATION: unit U21 lost all evidence anchors of member D:F22
+PRESERVATION: unit U21 lost all evidence anchors of member D:F40
+PRESERVATION: unit U22 lost all evidence anchors of member D:F138
+PRESERVATION: unit U22 lost all evidence anchors of member D:F55
+PRESERVATION: unit U23 lost all evidence anchors of member D:F125
+PRESERVATION: unit U23 lost all evidence anchors of member D:F155
+PRESERVATION: unit U23 lost all evidence anchors of member D:F225
+PRESERVATION: unit U23 lost all evidence anchors of member D:F236
+PRESERVATION: unit U23 lost all evidence anchors of member D:F70
+PRESERVATION: unit U24 lost all evidence anchors of member D:F112
+PRESERVATION: unit U24 lost all evidence anchors of member D:F128
+PRESERVATION: unit U24 lost all evidence anchors of member D:F154
+PRESERVATION: unit U24 lost all evidence anchors of member D:F97
+PRESERVATION: unit U25 lost all evidence anchors of member D:F126
+PRESERVATION: unit U25 lost all evidence anchors of member D:F221
+PRESERVATION: unit U25 lost all evidence anchors of member D:F235
+PRESERVATION: unit U25 lost all evidence anchors of member D:F44
+PRESERVATION: unit U25 lost all evidence anchors of member D:F76
+PRESERVATION: unit U26 lost all evidence anchors of member D:F114
+PRESERVATION: unit U26 lost all evidence anchors of member D:F156
+PRESERVATION: unit U26 lost all evidence anchors of member D:F181
+PRESERVATION: unit U26 lost all evidence anchors of member D:F237
+PRESERVATION: unit U27 lost all evidence anchors of member D:F116
+PRESERVATION: unit U27 lost all evidence anchors of member D:F134
+PRESERVATION: unit U27 lost all evidence anchors of member D:F240
+PRESERVATION: unit U28 lost all evidence anchors of member D:F105
+PRESERVATION: unit U28 lost all evidence anchors of member D:F123
+PRESERVATION: unit U28 lost all evidence anchors of member D:F226
+PRESERVATION: unit U3 lost all evidence anchors of member D:F72
+PRESERVATION: unit U34 lost all evidence anchors of member D:F20
+PRESERVATION: unit U35 lost all evidence anchors of member D:F24
+PRESERVATION: unit U36 lost all evidence anchors of member D:F25
+PRESERVATION: unit U37 lost all evidence anchors of member D:F26
+PRESERVATION: unit U38 lost all evidence anchors of member D:F27
+PRESERVATION: unit U39 lost all evidence anchors of member D:F29
+PRESERVATION: unit U4 lost all evidence anchors of member D:F166
+PRESERVATION: unit U4 lost all evidence anchors of member D:F75
+PRESERVATION: unit U40 lost all evidence anchors of member D:F30
+PRESERVATION: unit U41 lost all evidence anchors of member D:F31
+PRESERVATION: unit U42 lost all evidence anchors of member D:F32
+PRESERVATION: unit U43 lost all evidence anchors of member D:F33
+PRESERVATION: unit U44 lost all evidence anchors of member D:F35
+PRESERVATION: unit U45 lost all evidence anchors of member D:F38
+PRESERVATION: unit U46 lost all evidence anchors of member D:F41
+PRESERVATION: unit U47 lost all evidence anchors of member D:F46
+PRESERVATION: unit U48 lost all evidence anchors of member D:F47
+PRESERVATION: unit U49 lost all evidence anchors of member D:F48
+PRESERVATION: unit U50 lost all evidence anchors of member D:F49
+PRESERVATION: unit U51 lost all evidence anchors of member D:F51
+PRESERVATION: unit U52 lost all evidence anchors of member D:F52
+PRESERVATION: unit U53 lost all evidence anchors of member D:F56
+PRESERVATION: unit U54 lost all evidence anchors of member D:F58
+PRESERVATION: unit U55 lost all evidence anchors of member D:F59
+PRESERVATION: unit U56 lost all evidence anchors of member D:F60
+PRESERVATION: unit U57 lost all evidence anchors of member D:F61
+PRESERVATION: unit U58 lost all evidence anchors of member D:F62
+PRESERVATION: unit U59 lost all evidence anchors of member D:F64
+PRESERVATION: unit U6 lost all evidence anchors of member D:F149
+PRESERVATION: unit U60 lost all evidence anchors of member D:F65
+PRESERVATION: unit U61 lost all evidence anchors of member D:F66
+PRESERVATION: unit U62 lost all evidence anchors of member D:F67
+PRESERVATION: unit U63 lost all evidence anchors of member D:F68
+PRESERVATION: unit U64 lost all evidence anchors of member D:F69
+PRESERVATION: unit U65 lost all evidence anchors of member D:F71
+PRESERVATION: unit U66 lost all evidence anchors of member D:F73
+PRESERVATION: unit U67 lost all evidence anchors of member D:F74
+PRESERVATION: unit U68 lost all evidence anchors of member D:F78
+PRESERVATION: unit U69 lost all evidence anchors of member D:F82
+PRESERVATION: unit U70 lost all evidence anchors of member D:F83
+PRESERVATION: unit U71 lost all evidence anchors of member D:F84
+PRESERVATION: unit U72 lost all evidence anchors of member D:F85
+PRESERVATION: unit U73 lost all evidence anchors of member D:F86
+PRESERVATION: unit U74 lost all evidence anchors of member D:F88
+PRESERVATION: unit U75 lost all evidence anchors of member D:F89
+PRESERVATION: unit U76 lost all evidence anchors of member D:F91
+PRESERVATION: unit U77 lost all evidence anchors of member D:F92
+PRESERVATION: unit U78 lost all evidence anchors of member D:F93
+PRESERVATION: unit U79 lost all evidence anchors of member D:F94
+PRESERVATION: unit U8 merge group size 7 > 6
+PRESERVATION: unit U8 lost all evidence anchors of member D:F54
+PRESERVATION: unit U80 lost all evidence anchors of member D:F95
+PRESERVATION: unit U81 lost all evidence anchors of member D:F96
+PRESERVATION: unit U82 lost all evidence anchors of member D:F98
+PRESERVATION: unit U83 lost all evidence anchors of member D:F100
+PRESERVATION: unit U84 lost all evidence anchors of member D:F101
+PRESERVATION: unit U85 lost all evidence anchors of member D:F107
+PRESERVATION: unit U86 lost all evidence anchors of member D:F108
+PRESERVATION: unit U87 lost all evidence anchors of member D:F109
+PRESERVATION: unit U88 lost all evidence anchors of member D:F110
+PRESERVATION: unit U89 lost all evidence anchors of member D:F111
+PRESERVATION: unit U9 merge group size 7 > 6
+PRESERVATION: unit U9 lost all evidence anchors of member D:F28
+PRESERVATION: unit U90 lost all evidence anchors of member D:F113
+PRESERVATION: unit U91 lost all evidence anchors of member D:F115
+PRESERVATION: unit U92 lost all evidence anchors of member D:F122
+PRESERVATION: unit U93 lost all evidence anchors of member D:F124
+PRESERVATION: unit U94 lost all evidence anchors of member D:F127
+PRESERVATION: unit U95 lost all evidence anchors of member D:F129
+PRESERVATION: unit U96 lost all evidence anchors of member D:F135
+PRESERVATION: unit U97 lost all evidence anchors of member D:F136
+PRESERVATION: unit U98 lost all evidence anchors of member D:F139
+PRESERVATION: unit U99 lost all evidence anchors of member D:F141
+missing_ids: D:F100, D:F101, D:F105, D:F107, D:F108, D:F109, D:F110, D:F111, D:F112, D:F113, D:F114, D:F115, D:F116, D:F122, D:F123, D:F124, D:F125, D:F126, D:F127, D:F128, D:F129, D:F134, D:F135, D:F136, D:F138, D:F139, D:F141, D:F143, D:F144, D:F145, D:F147, D:F148, D:F149, D:F150, D:F151, D:F152, D:F153, D:F154, D:F155, D:F156, D:F157, D:F158, D:F159, D:F160, D:F161, D:F162, D:F163, D:F164, D:F165, D:F166, D:F167, D:F168, D:F169, D:F171, D:F173, D:F174, D:F175, D:F176, D:F177, D:F178, D:F179, D:F18, D:F180, D:F181, D:F182, D:F183, D:F184, D:F185, D:F187, D:F188, D:F189, D:F190, D:F191, D:F192, D:F193, D:F194, D:F195, D:F196, D:F197, D:F198, D:F199, D:F20, D:F200, D:F201, D:F202, D:F203, D:F204, D:F205, D:F206, D:F207, D:F208, D:F210, D:F212, D:F214, D:F215, D:F216, D:F217, D:F218, D:F219, D:F22, D:F220, D:F221, D:F222, D:F223, D:F224, D:F225, D:F226, D:F227, D:F228, D:F229, D:F230, D:F231, D:F232, D:F233, D:F235, D:F236, D:F237, D:F238, D:F239, D:F24, D:F240, D:F241, D:F242, D:F25, D:F26, D:F27, D:F28, D:F29, D:F30, D:F31, D:F32, D:F33, D:F35, D:F38, D:F40, D:F41, D:F42, D:F43, D:F44, D:F46, D:F47, D:F48, D:F49, D:F51, D:F52, D:F53, D:F54, D:F55, D:F56, D:F58, D:F59, D:F60, D:F61, D:F62, D:F64, D:F65, D:F66, D:F67, D:F68, D:F69, D:F70, D:F71, D:F72, D:F73, D:F74, D:F75, D:F76, D:F77, D:F78, D:F82, D:F83, D:F84, D:F85, D:F86, D:F88, D:F89, D:F91, D:F92, D:F93, D:F94, D:F95, D:F96, D:F97, D:F98
+[harness 03:37:28] fidelity audit clean
+[harness 03:37:28] stage 8: deliver (local only)
+severity counts: {"high": 19, "medium": 81, "low": 148}
+deliverables:
+  /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/report.md (404206 bytes)
+  /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/findings.json (469985 bytes)
+  /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/synthesis_ledger.json (16638 bytes)
+  /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/timings.tsv (360 bytes)
+[harness 03:37:28] run complete: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local

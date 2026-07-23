@@ -1,0 +1,240 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+docs-and-comments.md F5: hedged contract ('either ... or'); pin ONE recommendation
+docs-and-comments.md F9: evidence has no file:line anchor
+docs-and-comments.md F10: evidence has no file:line anchor
+docs-and-comments.md F15: hedged contract ('either ... or'); pin ONE recommendation
+docs-and-comments.md F17: hedged contract ('either ... or'); pin ONE recommendation
+docs-and-comments.md F22: evidence has no file:line anchor
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+Let me finalize the findings. I have enough evidence.
+
+### F1 — HDBSCAN `n_jobs` docstring contradicts the actual default (`None` vs `4`)
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:486-490 — docstring reads `n_jobs : int, default=None` and states "`None` means 1 unless in a joblib.parallel_backend context", but the constructor signature at line 658 sets `n_jobs=4`. Users following the documented default will get a completely different concurrency setting than the code enforces.
+scenario: "User reads docstring expecting single-thread default → HDBSCAN silently spawns 4 workers, oversubscribing CPUs in shared or nested-parallel contexts"
+contract: The `n_jobs` docstring in the `HDBSCAN` class must state `default=4` and remove the "None means 1" boilerplate (or the constructor default must be changed to `None`); one of the two must move so signature and prose agree.
+instances: single-instance
+
+### F2 — `_hdbscan_prims` docstring documents a nonexistent `copy` parameter and omits `algo`/`leaf_size`
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:313-318 — docstring lists `copy : bool, default=False` with narrative about precomputed matrices, yet the `_hdbscan_prims` signature at lines 269-278 has no `copy` argument. Conversely the real parameters `algo` (line 271) and `leaf_size` (line 275) receive no docstring entry.
+scenario: "Contributor reads _hdbscan_prims docstring → believes copy is honored (it isn't), and finds no reference for the two parameters that actually control tree selection"
+contract: Delete the `copy` entry from `_hdbscan_prims`'s docstring and add entries for `algo` and `leaf_size` matching the real signature.
+instances: single-instance
+
+### F3 — `_brute_mst` docstring parameter name and `min_samples` default are wrong
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:82-97 — the parameter section names the array `mututal_reachability_graph:` (typo, and does not match the actual argument `mutual_reachability`), and declares `min_samples : int, default=None` while the signature `_brute_mst(mutual_reachability, min_samples)` has no default at all.
+scenario: "Reader relies on documented parameter name/default → uses wrong keyword or assumes None is accepted, hitting TypeError at call time"
+contract: Rename the parameter in the docstring to `mutual_reachability` and remove the `default=None` annotation to match the real signature.
+instances: single-instance
+
+### F4 — `_hdbscan_brute` docstring `min_samples` default mismatches signature
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:179 vs. line 160 — docstring says `min_samples : int, default=None`, signature declares `min_samples=5`.
+scenario: "Caller expects None default → passes None and gets an unexpected NearestNeighbors/partition error downstream"
+contract: The `_hdbscan_brute` docstring must document `min_samples : int, default=5`.
+instances: [sklearn/cluster/_hdbscan/hdbscan.py:179, sklearn/cluster/_hdbscan/hdbscan.py:290]
+
+### F5 — `_hdbscan_brute` documents `alpha : float, default=1.0` but signature default is `None`
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:161 sets `alpha=None`; docstring at line 183 asserts `alpha : float, default=1.0`. In the body at line 241 the code unconditionally runs `distance_matrix /= alpha`, so calling with the documented default `1.0` works, but calling with the actual signature default (`None`) will raise a TypeError.
+scenario: "User invokes _hdbscan_brute without alpha per docstring's stated default → TypeError: unsupported operand type(s) for /=: 'ndarray' and 'NoneType'"
+contract: Either update the signature to `alpha=1.0`, or update the docstring's `default=1.0` — the two must agree; documentation must reflect the real default.
+instances: single-instance
+
+### F6 — Docstring anchor mismatch: `User Guide <HDBSCAN>` reference does not exist
+severity: medium
+evidence: examples/cluster/plot_hdbscan.py:104 — `see :ref:\`User Guide <HDBSCAN>\``. The actual anchor label in doc/modules/clustering.rst is `.. _hdbscan:` (lowercase), so this cross-reference fails to resolve in the rendered docs.
+scenario: "Sphinx build of gallery example → broken/undefined :ref: link labeled 'User Guide' either warns or renders as raw text for readers"
+contract: Change the reference target to lowercase `hdbscan` to match the RST anchor.
+instances: single-instance
+
+### F7 — `dbscan_clustering` docstring omits the removal of border points invariant and mislabels outputs
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:923-958 — Returns section lists label rules "-1 noise", "-2 infinite", "-3 missing", but the implementation at lines 960-969 only reassigns `_OUTLIER_ENCODING["infinite"]` and `_OUTLIER_ENCODING["missing"]`; there is no `-1` produced by the underlying `labelling_at_cut` unless a cluster is smaller than `min_cluster_size`. More importantly, the "See Also" invariant that `dbscan_clustering` returns labels only for the data seen during `fit` (relies on `self.labels_`) is left implicit — calling it before `fit` raises AttributeError but nothing in the docstring warns of the `fit`-required precondition.
+scenario: "User calls `HDBSCAN().dbscan_clustering(0.3)` before fit per docstring reading → AttributeError on `self._single_linkage_tree_`"
+contract: Add an explicit precondition line stating that `fit` must be called first, and clarify that the -2/-3 labels only appear when non-finite samples were present during `fit`.
+instances: single-instance
+
+### F8 — Test-narration docstring lies about what is being tested (`test_hdbscan_precomputed_non_brute`)
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:276-284 — docstring claims the test checks that HDBSCAN "correctly raises an error when passing precomputed data while requesting a tree-based algorithm", but the algorithm string passed is `prims_kdtree` / `prims_balltree`, and `_parameter_constraints["algorithm"]` in `hdbscan.py:629-638` only accepts `{"auto", "brute", "kdtree", "balltree"}`. The `ValueError` therefore comes from parameter-name validation, not from the precomputed+tree combination the narration promises. The intended combination is never actually exercised.
+scenario: "Behavior change removes the precomputed-vs-tree check in fit → test still passes on unrelated grounds, giving false coverage confidence"
+contract: The test must call `HDBSCAN(metric='precomputed', algorithm=f'{tree}tree')` with a valid algorithm name, or the docstring must be rewritten to state that invalid algorithm names raise.
+instances: single-instance
+
+### F9 — User-guide prose contains stale "at this staged" grammar and describes wrong noise criterion
+severity: low
+evidence: doc/modules/clustering.rst hunk lines ~1023-1027 — "Any points whose core distance is less than :math:`\varepsilon`: are at this staged marked as noise." Two problems verified: (a) typo "at this staged" (should be "at this stage"); (b) the invariant is inverted — points with core distance *greater than* ε are the ones DBSCAN* treats as noise, not those less than ε. Also stray trailing colons after `\varepsilon`: appear twice on those lines.
+scenario: "Reader learning HDBSCAN from user guide → internalizes an incorrect definition of DBSCAN* noise assignment"
+contract: Fix the typo to "at this stage" and correct the direction of the inequality: "Any points whose core distance is greater than ε are marked as noise."
+instances: single-instance
+
+### F10 — User-guide prose uses undefined variable name `minimum_cluster_size` in place of `min_cluster_size`
+severity: low
+evidence: doc/modules/clustering.rst hunk lines ~1060-1064 — "components with fewer than `minimum_cluster_size` many samples are considered noise. In practice, one can set `minimum_cluster_size = min_samples`". No parameter named `minimum_cluster_size` exists on `HDBSCAN`; the actual parameter is `min_cluster_size`.
+scenario: "User copies the guide's example `HDBSCAN(minimum_cluster_size=...)` → TypeError / warning about unknown parameter"
+contract: Replace both `minimum_cluster_size` occurrences with `min_cluster_size` to match the real API.
+instances: single-instance
+
+### F11 — Docstring/comment typos: repeated "reahability", "collecteion", "smaler", "simbling", "homogenous", "mutual_reachibility"
+severity: low
+evidence: sklearn/cluster/_hdbscan/_linkage.pyx:75-76, 137-138, 228-229 ("mutual-reahability graph", "collecteion of edges"); sklearn/cluster/_hdbscan/hdbscan.py:102-103, 143-144 (same two typos); sklearn/cluster/_hdbscan/_tree.pyx:133 ("Clusters smaler than this"); sklearn/cluster/_hdbscan/_tree.pyx:503 ("largest lambda of any simbling node"); sklearn/cluster/_hdbscan/hdbscan.py:906 ("homogenous 3D array"); sklearn/cluster/_hdbscan/_reachability.pyx:127,144,149,182,206,209,210 (`mutual_reachibility_distance` variable name — spelled "reachibility" throughout while the surrounding docstring/module use "reachability"). Because the misspelled identifier is a local variable, it works at runtime but is inconsistent with the file's own naming.
+scenario: "Reader searches codebase for 'mutual_reachability' → misses the local computation variable; docstring typos leak into rendered HTML docs"
+contract: Correct the spellings to "reachability", "collection", "smaller", "sibling", "homogeneous"; rename the local variable to `mutual_reachability_distance`.
+instances: [sklearn/cluster/_hdbscan/_linkage.pyx:75, sklearn/cluster/_hdbscan/_linkage.pyx:76, sklearn/cluster/_hdbscan/_linkage.pyx:137, sklearn/cluster/_hdbscan/_linkage.pyx:138, sklearn/cluster/_hdbscan/_linkage.pyx:228, sklearn/cluster/_hdbscan/_linkage.pyx:229, sklearn/cluster/_hdbscan/hdbscan.py:102, sklearn/cluster/_hdbscan/hdbscan.py:103, sklearn/cluster/_hdbscan/hdbscan.py:143, sklearn/cluster/_hdbscan/hdbscan.py:144, sklearn/cluster/_hdbscan/hdbscan.py:906, sklearn/cluster/_hdbscan/_tree.pyx:133, sklearn/cluster/_hdbscan/_tree.pyx:503, sklearn/cluster/_hdbscan/_reachability.pyx:127, sklearn/cluster/_hdbscan/_reachability.pyx:144, sklearn/cluster/_hdbscan/_reachability.pyx:149, sklearn/cluster/_hdbscan/_reachability.pyx:182, sklearn/cluster/_hdbscan/_reachability.pyx:206, sklearn/cluster/_hdbscan/_reachability.pyx:209, sklearn/cluster/_hdbscan/_reachability.pyx:210]
+
+### F12 — `max_distance` docstring refers to a nonexistent identifier `max_dist`
+severity: low
+evidence: sklearn/cluster/_hdbscan/_reachability.pyx:68-72 and 174-178 — both `max_distance` parameter blocks state "it is instead truncated to `max_dist`", but there is no `max_dist` argument or attribute anywhere; the correct name is `max_distance`.
+scenario: "Reader trying to enable this fallback searches for `max_dist` → finds nothing; passes `max_dist=` and gets a TypeError"
+contract: Replace `max_dist` with `max_distance` in both docstrings.
+instances: [sklearn/cluster/_hdbscan/_reachability.pyx:71, sklearn/cluster/_hdbscan/_reachability.pyx:177]
+
+### F13 — `_sparse_mutual_reachability_graph` docstring documents the wrong parameter name
+severity: low
+evidence: sklearn/cluster/_hdbscan/_reachability.pyx:160-179 — Parameters section documents `distance_matrix : sparse matrix ...` and `further_neighbor_idx`/`max_distance`, but the function signature at 152-159 takes `data`, `indices`, `indptr`, `n_samples`, `further_neighbor_idx`, `max_distance`. `distance_matrix` is not a parameter; `data`, `indices`, `indptr`, `n_samples` are undocumented.
+scenario: "Contributor reads the docstring → is misled about the calling convention (assumes it takes a sparse matrix object)"
+contract: The docstring must document the four actually-present positional arguments (`data`, `indices`, `indptr`, `n_samples`) and drop the fictitious `distance_matrix` entry.
+instances: single-instance
+
+### F14 — `bfs_from_hierarchy` invariant comment describes a nonexistent indexing convention
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:97-98 — comment says "node i is formed by the union of nodes hierarchy[i - n_samples, 0] and hierarchy[i - n_samples, 1]". `hierarchy` is a 1-D structured array of `HIERARCHY_t` (fields `left_node`, `right_node`, `value`, `cluster_size`); `hierarchy[..., 0]` is not the actual indexing used in the body (the loop uses `hierarchy[node].left_node`/`right_node`). The comment leaks the old scipy tuple/matrix indexing convention.
+scenario: "Reader debugging the BFS references the comment → looks for numeric field indices that do not exist in the dtype"
+contract: Rewrite the invariant comment in terms of the real fields, e.g. "node i is formed by the union of `hierarchy[i - n_samples].left_node` and `hierarchy[i - n_samples].right_node`".
+instances: single-instance
+
+### F15 — `_do_labelling` Returns docstring makes a claim that is not enforced by the code [out-of-theme]
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:462-464 — Returns says "a label of -1 denotes a noise assignment", but at lines 497-506 the `label` variable that is written into `result` may take the value of `cluster_label_map[cluster]` where `cluster` is the child index `n`; if `n` is not in `cluster_label_map`, this raises KeyError. That behavior isn't in the contract and there is no cross-check ensuring `cluster_label_map` covers every reachable value. This isn't a docs-only defect (the code lacks defensive handling for the contract the docstring promises), which is why I flag it out-of-theme.
+scenario: "clusters passed by _get_clusters miss a value present in labels → KeyError instead of the documented -1"
+contract: Either enforce the noise fall-through the docstring promises (default to NOISE for unknown `cluster` keys) or narrow the docstring to state that `cluster_label_map` must cover every non-root node index.
+instances: single-instance
+
+### F16 — Stale user-guide sentence claims "The HDBSCAN implementation is multithreaded"
+severity: low
+evidence: doc/modules/clustering.rst hunk near line 1149 — "The HDBSCAN implementation is multithreaded, and has better algorithmic runtime complexity than OPTICS…" while sklearn/cluster/_hdbscan/_reachability.pyx:140-141 contains a TODO explicitly noting that the loop is **not** yet paralleled: "# TODO: Update w/ prange with thread count based on _openmp_effective_n_threads". The user-facing docs therefore promise multithreading that this implementation does not deliver.
+scenario: "Users choosing HDBSCAN over OPTICS on the basis of multithreading claim → surprised by wall-time single-thread performance"
+contract: Remove "multithreaded, and" (or reword) from the OPTICS-vs-HDBSCAN paragraph until `_dense_mutual_reachability_graph` is parallelized.
+instances: single-instance
+
+### F17 — `HDBSCAN.labels_` docstring's outlier bullets contradict actual behavior for `dbscan_clustering`/precomputed
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:530-538 — the Attributes list unconditionally asserts label `-2` for infinite samples and `-3` for missing. But in `fit` (lines 730-753) the -2/-3 remapping is skipped when `metric == "precomputed"` (only `_get_finite_row_indices` is not invoked, no remap block runs), so a precomputed dense matrix containing `np.inf` never yields a `-2` label — those rows silently participate in clustering. The docstring gives no such caveat.
+scenario: "User with a precomputed distance matrix containing np.inf reads docstring → expects -2 for those points; gets an ordinary cluster id or ordinary -1 noise"
+contract: The `labels_` docstring must add "-2/-3 labels are only produced when `metric != 'precomputed'`; for precomputed distance matrices, non-finite entries are either raised on (nan) or left untouched (inf)."
+instances: single-instance
+
+### F18 — `_compute_stability` contains a duplicated `births = np.full(...)` line signalling a stale copy-paste [out-of-theme]
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:252-254 — `births = np.full(largest_child + 1, np.nan, dtype=np.float64)` appears twice in immediate succession with no intervening code that uses the first result. Either the first is dead narration noise or the second is a leftover from a refactor; nothing in a comment explains the duplication.
+scenario: "Reader assumes both lines matter → wastes time hunting non-existent invariant"
+contract: Delete the duplicate `births = np.full(...)` line (the second, which is the one the code actually depends on, should remain).
+instances: single-instance
+
+### F19 — `_condense_tree` docstring says returned dtype is `HIERARCHY_dtype`-shaped but returns `CONDENSED_dtype`
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:117-142 — Returns block correctly states `dtype=CONDENSED_dtype`. However the same file's parallel signatures document the shape as `(n_samples,)` in multiple places (e.g. `_get_clusters` at line 656 and `_do_labelling` at line 447), while these arrays are actually variable-length (`result_list` length depends on branching in the condense loop). The pinned shape claim `(n_samples,)` is misleading — in general the condensed tree has neither `n_samples` nor `n_samples - 1` rows.
+scenario: "Reader relies on documented `(n_samples,)` shape to preallocate or index → out-of-bounds on datasets where condense produces a different number of edges"
+contract: Change the documented shape of `condensed_tree` from `(n_samples,)` to `(n_edges,)` (or similar) to reflect the true variable-length structure.
+instances: [sklearn/cluster/_hdbscan/_tree.pyx:138, sklearn/cluster/_hdbscan/_tree.pyx:447, sklearn/cluster/_hdbscan/_tree.pyx:656]
+
+### F20 — `_get_clusters` Returns block advertises a `stabilities` output that is never returned
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:681-691 — Returns section lists three outputs `labels`, `probabilities`, `stabilities`, but the function's `return` statement at line 797 is `return (labels, probs)`. The `stabilities` claim is stale.
+scenario: "Caller unpacks per docstring `labels, probs, stab = _get_clusters(...)` → ValueError: not enough values to unpack"
+contract: Remove the `stabilities` entry from the Returns section (or rename the second output to match).
+instances: single-instance
+
+### F21 — `_get_clusters` `# (exclude root)` narration comment sits after the slice that already excluded it
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:702-710 — the top comment "Assume clusters are ordered by numeric id equivalent to a topological sort of the tree; This is valid given the current implementation above, so don't change that ... or if you do, change this accordingly!" refers to "the current implementation above", but the file layout places _condense_tree above; the guarded invariant is that `stability.keys()` sort ordering matches topological order. The comment is imprecise about which implementation "above" is meant, and the trailing `# (exclude root)` on line 710 sits on a separate line rather than annotating the `[:-1]` slice, making the intent easy to miss during edits.
+scenario: "Someone refactors _compute_stability's dict construction → silently breaks _get_clusters' ordering invariant that this comment tries but fails to pin to a specific function"
+contract: Move `# (exclude root)` to end-of-line on the slice (or delete the redundant line) and update the general comment to name `_compute_stability` explicitly so the invariant is anchored.
+instances: single-instance
+
+### F22 — `_hierarchical_fast.pyx` deletion of `cdef` block leaves no comment tying the fields to the new `.pxd` [out-of-theme]
+severity: low
+evidence: sklearn/cluster/_hierarchical_fast.pyx hunk at lines 322-337 — the three `cdef intp_t next_label / intp_t[:] parent / intp_t[:] size` declarations were removed from the `UnionFind` class body and moved to the new `sklearn/cluster/_hierarchical_fast.pxd`. Neither file carries a comment noting that the declarations are now in the `.pxd` (nor that removing them again would break `_hdbscan/_linkage.pyx` which `cimport`s `UnionFind`). This is a lost-semantics documentation regression: the previous single-file view was self-describing; the current split has no cross-reference.
+scenario: "Future contributor editing `_hierarchical_fast.pyx` reintroduces `cdef intp_t next_label` for clarity → Cython 'field defined twice' error, or removes the pxd thinking it is dead"
+contract: Add a one-line comment in `_hierarchical_fast.pyx` above `cdef class UnionFind(object):` pointing at `_hierarchical_fast.pxd` where the fields and cdef methods are now declared.
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record, reviewing through ONE assigned theme lens. You are one of several
+mutually-blind reviewers; do not assume anyone else will catch what you skip. Your final
+response text IS the deliverable file — output only the findings document described below.
+
+# Your theme (you OWN this axis)
+
+Theme: docs-and-comments
+Charter: Stale or wrong comments, missing invariant documentation on complex logic, and narration noise.
+
+Hunt this axis exhaustively across every changed file your theme could plausibly implicate.
+You must still report CRITICAL defects outside your theme that you stumble on — append
+" [out-of-theme]" to the title of any such finding. Do not pad: out-of-theme findings are
+for defects you actually verified while working your own axis.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/PLAN.md
+- Diff manifest: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/DIFF_MANIFEST.md
+- Per-file hunk diffs: /Users/dabs/Development/rh-wt-26385-local/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /Users/dabs/Development/rh-wt-26385-local
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk every changed file your theme could plausibly implicate: read its hunk diff, then
+   open the full file in the worktree and verify what the hunk implies — never trust the
+   hunk alone. `.pyx`/`.pxd` Cython files are first-class changed code; review them as
+   carefully as `.py`.
+4. Review BOTH conformance directions through your theme's lens:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+6. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+The instances line must be EXACTLY one of those two forms — no annotations after
+"single-instance". Number findings sequentially from F1. No preamble, no summary, no
+headings other than the finding blocks, no hedging ("consider possibly" is banned). If you
+genuinely verified there is nothing to report on your axis, output exactly: NO FINDINGS

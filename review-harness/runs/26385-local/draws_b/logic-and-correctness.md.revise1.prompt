@@ -1,0 +1,169 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+logic-and-correctness.md F9: hedged contract ('either ... or'); pin ONE recommendation
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+Acknowledged.
+
+Now let me also verify the `_do_labelling` bug where `label` variable is not typed. `label` is used without `cdef` — this is a Python-level assignment in a cdef function, which is fine but slow. Not a correctness bug.
+
+Let me finalize my findings now. I have enough evidence:
+
+### F1 — `_do_labelling` reads `parent_lambda` and `threshold` per-sample instead of comparing scalars, causing potential wrong labels for `allow_single_cluster` epsilon path
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:498-506 — `parent_lambda = lambda_array[child_array == n]` is an ndarray (length 1 in the intended case), and `threshold = lambda_array[parent_array == cluster].max()` uses `cluster` which is the union-find root that at this branch equals `root_cluster` (not a leaf/point), so `parent_array == cluster` may match zero entries because in `allow_single_cluster` mode all non-cluster edges were unioned; the min-parent root itself may have no child edges left after masking, producing `max()` on an empty array which raises `ValueError` at runtime.
+scenario: "User calls `HDBSCAN(allow_single_cluster=True, cluster_selection_epsilon=0.0).fit(X)` on data that produces exactly one cluster where every child of the root is a leaf-cluster → `_do_labelling` raises `ValueError: zero-size array` when computing per-sample thresholds"
+contract: The threshold and per-sample lambda arithmetic must be scalar-safe; if `parent_array == cluster` is empty, use the max child lambda over `condensed_tree` for that parent, and coerce `parent_lambda` to a scalar with an explicit `[0]` index.
+instances: single-instance
+
+### F2 — `test_dbscan_clustering_outlier_data` computes `clean_idx` by summing ndarrays instead of concatenating them, silently masking the wrong indices
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:212 — `clean_idx = list(set(range(200)) - set(missing_labels_idx + infinite_labels_idx))`. With `missing_labels_idx == np.array([2,5])` and `infinite_labels_idx == np.array([0])`, NumPy broadcasts the `+` operator to element-wise addition producing `np.array([2, 5])`, so the "outlier" set becomes `{2, 5}` — the infinite index `0` is not excluded. `clean_idx` therefore contains index 0 (an `np.inf` row), and the subsequent `assert_array_equal(clean_labels, labels[clean_idx])` may fail or pass only by accident.
+scenario: "Test run with any parametrized `cut_distance` → `clean_model.fit(X_outlier[clean_idx])` sees an infinite-valued row and behaves as another test case; the assertion at line 215 is comparing wrong slices"
+contract: Concatenate index arrays with `np.concatenate([missing_labels_idx, infinite_labels_idx])` (or use `.tolist()` and list concatenation) before wrapping in `set(...)`.
+instances: single-instance
+
+### F3 — `test_hdbscan_precomputed_non_brute` never exercises the intended check because `algorithm="prims_kdtree"`/`"prims_balltree"` is rejected by parameter validation
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:282 — `HDBSCAN(metric="precomputed", algorithm=f"prims_{tree}tree")` uses algorithm names that are not in the allowed StrOptions set `{"auto","brute","kdtree","balltree"}` (see sklearn/cluster/_hdbscan/hdbscan.py:629-638). `_validate_params()` raises `InvalidParameterError` (a `ValueError` subclass) before the "precomputed + tree" guard at hdbscan.py:772-783 is ever hit, so the test passes vacuously and does not validate what its docstring claims.
+scenario: "Regression is introduced that silently allows `algorithm='kdtree'` with `metric='precomputed'` → this test still passes because it uses a bogus algorithm name and only tests parameter validation"
+contract: Change the parametrization to `["kdtree", "balltree"]` so the intended precomputed-vs-tree guard is actually exercised.
+instances: single-instance
+
+### F4 — `_hdbscan_brute` divides `distance_matrix /= alpha` with `alpha=None` default, raising `TypeError` if called without alpha
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:158-241 — signature is `def _hdbscan_brute(..., alpha=None, ...)`; body performs `distance_matrix /= alpha` at line 241. All in-tree call sites pass `alpha=1.0` from `HDBSCAN.__init__`, but the mismatch between the `None` default and the documented `default=1.0` at line 183 and the arithmetic use is a defect.
+scenario: "Downstream user imports the private helper (or docs referencing `default=1.0` mislead a maintainer) → runtime `TypeError: unsupported operand type(s) for /=: 'numpy.ndarray' and 'NoneType'`"
+contract: Default `alpha=1.0` in the function signature to match both the docstring and the arithmetic contract.
+instances: single-instance
+
+### F5 — `HDBSCAN.__init__` default `n_jobs=4` contradicts the documented `default=None` and departs from scikit-learn convention
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:658 — `n_jobs=4` in the signature; sklearn/cluster/_hdbscan/hdbscan.py:486-490 documents `n_jobs : int, default=None`; parameter constraint at line 640 is `[Integral, None]`. All other scikit-learn estimators use `None` as the default sentinel, and hard-coding `4` overrides `joblib.parallel_backend` contexts silently.
+scenario: "User sets `joblib.parallel_backend('threading', n_jobs=8)` and constructs `HDBSCAN()` expecting the default to defer to the backend → HDBSCAN uses 4 threads regardless, contradicting the docstring's contract"
+contract: Default `n_jobs=None` to match the documented behavior and the rest of scikit-learn.
+instances: single-instance
+
+### F6 — `remap_single_linkage_tree` iterates `non_finite` as a set, giving nondeterministic ordering of the appended outlier tree entries
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:388 — `for i, outlier in enumerate(non_finite):` where the caller at hdbscan.py:834-839 passes `non_finite=set(infinite_index + missing_index)`. Set iteration order in CPython is not part of the language spec (though implementation-defined for hashable ints); the resulting order of outlier rows in the concatenated tree depends on hash and insertion history. Since the outlier rows are consumed by downstream tree consumers keyed by node id, this is not a labels bug today, but it exposes the tree structure to a nondeterministic ordering that will silently break stability tests / cached serializations.
+scenario: "Persisted `_single_linkage_tree_` from two runs on identical input with non-finite rows → byte-differs across runs; downstream tools that hash the tree see spurious changes"
+contract: Sort `non_finite` (or accept a sorted array) before enumeration so the appended outlier entries are deterministic.
+instances: single-instance
+
+### F7 — `_condense_tree` builds `ignore` sized to `len(node_list)` but the `node_list` returned by `bfs_from_hierarchy` may not include indices used to write into `ignore[sub_node]`
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:161 — `ignore = np.zeros(len(node_list), dtype=bool)`. In the "both children small" and single-side branches, indices written are `ignore[sub_node]` where `sub_node` iterates results of recursive `bfs_from_hierarchy(hierarchy, left/right)`. For a well-formed hierarchy of `n_samples` samples, the initial BFS from `root = 2*(n_samples-1)` visits all `2*n_samples - 1` nodes, so `len(node_list) == 2*n_samples - 1` and indices in `[0, 2*n_samples-2]` are valid. However, `ignore[node]` at line 164 uses `node`, which can be up to `root = 2*(n_samples-1) = 2*n_samples - 2` — the array size `2*n_samples - 1` is exactly `root + 1`, so within bounds. The invariant that BFS visits every node is not enforced or asserted; any future refactor that skips duplicate nodes in BFS breaks `ignore` sizing without a bounds error under Cython `boundscheck=False`.
+scenario: "A future edit reduces `bfs_from_hierarchy` output size (e.g., filters leaves) → `ignore[sub_node]` writes past the end of the array, silently corrupting adjacent memory when `boundscheck=False`"
+contract: Size `ignore` from a semantically explicit expression tied to the hierarchy (e.g., `2 * hierarchy.shape[0] + 1`) rather than `len(node_list)`.
+instances: single-instance
+
+### F8 — `csgraph.connected_components` return value is treated as a comparable scalar without unpacking, silently changing meaning if `return_labels` semantics change
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:111-116 — `if (csgraph.connected_components(mutual_reachability, directed=False, return_labels=False) > 1):`. `return_labels=False` currently returns a single `int`, so `> 1` is well-defined. However, historical scipy versions have returned a tuple even with `return_labels=False` in some contexts; the code is not defensive against that and will silently do wrong comparisons (`tuple > 1` raises `TypeError` on Python 3 — which is at least loud — but the reliance on a scipy implementation detail is fragile).
+scenario: "Older/newer scipy returns tuple/other type → `TypeError` at runtime or a truthy-but-meaningless comparison"
+contract: Explicitly unpack with `n_components = csgraph.connected_components(...)` and compare `n_components > 1`.
+instances: single-instance
+
+### F9 — `_hdbscan_brute` calls `distance_matrix /= alpha` even in the `metric="precomputed"` + `copy=False` path, mutating user-owned data
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:236-241 — when `metric == "precomputed"`, `distance_matrix = X.copy() if copy else X`; unconditionally after this, `distance_matrix /= alpha` runs in-place. With `copy=False` (the default) and `alpha != 1.0`, the user's precomputed distance matrix `X` is silently divided by `alpha` and mutated. The docstring at lines 207-212 states "it only applies when `metric='precomputed'`, when passing a dense array or a CSR sparse array/matrix", implying the user's matrix should be preserved when `copy=True` but does not warn that `copy=False` will mutate it.
+scenario: "User calls `HDBSCAN(metric='precomputed', alpha=2.0, copy=False).fit(D)` → `D` is silently divided by 2 in place; subsequent code using `D` gets wrong distances"
+contract: When `alpha != 1.0` and `metric == "precomputed"` and `copy=False`, either raise or force a copy before the in-place `/=`.
+instances: single-instance
+
+### F10 — `HIERARCHY_dtype` `cluster_size` field is typed `np.intp` but `remap_single_linkage_tree` writes `last_cluster_size + 1` values that grow monotonically without bounds check
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:387-391 — `last_cluster_size = tree[tree.shape[0] - 1]["cluster_size"]` then in a loop `last_cluster_size += 1` and stores `last_cluster_size + 1` per outlier. For `n_samples > 2^{31}` on Windows (where `intp` is 32-bit), this can overflow, but more importantly the reported `cluster_size` for each outlier row is `last_cluster_size + 1`, incremented per iteration — this is claiming the outlier cluster grows one-by-one, which is consistent with them being sequentially merged, but adds `outlier_count` to the reported cluster_size on the last row rather than the true final total (`n_samples`) if there are duplicates in `non_finite`. Since `non_finite=set(...)` removes duplicates, this happens to be correct today.
+scenario: "Refactor passes a list (not set) with duplicates in `non_finite` → `cluster_size` values grow past the true total sample count silently"
+contract: Derive final `cluster_size` from `len(tree)+1` invariant rather than counting increments.
+instances: single-instance
+
+### F11 — `_do_labelling`: `result = np.empty(root_cluster, dtype=np.intp)` conflates the value of `root_cluster` (min parent id) with the number of samples
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:480-481 — `root_cluster = np.min(parent_array); result = np.empty(root_cluster, dtype=np.intp)`. This relies on `root_cluster == n_samples` which is only guaranteed by `_condense_tree`'s numbering scheme (relabel starts at `n_samples + 1`, but the root itself is relabeled to `n_samples`). Any change to the relabel scheme in `_condense_tree` breaks `_do_labelling` silently: `result` will be sized wrong, and the subsequent `for n in range(root_cluster)` will over- or under-scan samples with no error.
+scenario: "Refactor of `_condense_tree` shifts the root label → `_do_labelling` returns an array of the wrong length; label assignments silently corrupted"
+contract: Pass `n_samples` explicitly to `_do_labelling` (or derive it from `condensed_tree[condensed_tree['cluster_size']==1]['child'].max()+1`) rather than relying on `min(parent_array)` accidentally equalling `n_samples`.
+instances: single-instance
+
+### F12 — `_hdbscan_prims` computes `NearestNeighbors(..., p=None)` which is incompatible with `metric='minkowski'` default
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:332-340 — passes `p=None` unconditionally. `NearestNeighbors.__init__` documents `p=2` default and accepts numeric `p`. Passing `p=None` circumvents the metric-specific `p` parameter and may cause distance computations to ignore user-provided `p` in `metric_params` for `minkowski`-family metrics.
+scenario: "User calls `HDBSCAN(metric='minkowski', metric_params={'p': 3})` with `algorithm='kdtree'` → `p=None` overrides; nearest-neighbor step may error or silently use `p=2`"
+contract: Do not pass `p=None`; let `NearestNeighbors` use its own default and route `p` through `metric_params`.
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record, reviewing through ONE assigned theme lens. You are one of several
+mutually-blind reviewers; do not assume anyone else will catch what you skip. Your final
+response text IS the deliverable file — output only the findings document described below.
+
+# Your theme (you OWN this axis)
+
+Theme: logic-and-correctness
+Charter: Wrong values, branches, and boundaries; off-by-one and edge conditions; unhandled cases; missing or wrong input validation.
+
+Hunt this axis exhaustively across every changed file your theme could plausibly implicate.
+You must still report CRITICAL defects outside your theme that you stumble on — append
+" [out-of-theme]" to the title of any such finding. Do not pad: out-of-theme findings are
+for defects you actually verified while working your own axis.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/PLAN.md
+- Diff manifest: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/DIFF_MANIFEST.md
+- Per-file hunk diffs: /Users/dabs/Development/rh-wt-26385-local/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /Users/dabs/Development/rh-wt-26385-local
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk every changed file your theme could plausibly implicate: read its hunk diff, then
+   open the full file in the worktree and verify what the hunk implies — never trust the
+   hunk alone. `.pyx`/`.pxd` Cython files are first-class changed code; review them as
+   carefully as `.py`.
+4. Review BOTH conformance directions through your theme's lens:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+6. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+The instances line must be EXACTLY one of those two forms — no annotations after
+"single-instance". Number findings sequentially from F1. No preamble, no summary, no
+headings other than the finding blocks, no hedging ("consider possibly" is banned). If you
+genuinely verified there is nothing to report on your axis, output exactly: NO FINDINGS

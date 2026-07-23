@@ -1,0 +1,83 @@
+### F1 — `UnionFind.union`/`fast_find` `noexcept` declared in .pxd but not in .pyx implementation
+severity: high
+evidence: sklearn/cluster/_hierarchical_fast.pxd:8-9 declare `cdef void union(self, intp_t m, intp_t n) noexcept` and `cdef intp_t fast_find(self, intp_t n) noexcept`; sklearn/cluster/_hierarchical_fast.pyx:331 and :339 implement them without `noexcept` (`cdef void union(self, intp_t m, intp_t n):` and `cdef intp_t fast_find(self, intp_t n):`).
+scenario: "Cython 3+ compilation of the module → signature-mismatch error or, in permissive versions, an unintended exception-propagation contract that silently diverges from the header's stated no-exception guarantee, breaking `nogil` callers."
+contract: Declarations in `_hierarchical_fast.pxd` and implementations in `_hierarchical_fast.pyx` must carry the identical `noexcept` annotation for both `union` and `fast_find`.
+instances: [sklearn/cluster/_hierarchical_fast.pxd:8, sklearn/cluster/_hierarchical_fast.pxd:9, sklearn/cluster/_hierarchical_fast.pyx:331, sklearn/cluster/_hierarchical_fast.pyx:339]
+
+### F2 — `allow_single_cluster` parameter drifts across three C types on the same call chain
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:60 declares `bint allow_single_cluster=False` in `tree_to_labels`; :435 declares `cnp.intp_t allow_single_cluster` in `_do_labelling`; :580 and :608 declare `cnp.intp_t allow_single_cluster` in `traverse_upwards`/`epsilon_search`; :646 declares `cnp.uint8_t allow_single_cluster=False` in `_get_clusters`. All are called with the same Python boolean and represent the same conceptual flag.
+scenario: "A future change that stores non-{0,1} in this argument → silent truthiness drift (e.g. -1 remains truthy through intp_t but wraps under uint8_t to 255, still truthy; but any refactor to an enum or tri-state will diverge silently across layers)."
+contract: A single canonical type — `bint` — must be used for `allow_single_cluster` at every `cdef` boundary in `_tree.pyx`.
+instances: [sklearn/cluster/_hdbscan/_tree.pyx:60, sklearn/cluster/_hdbscan/_tree.pyx:435, sklearn/cluster/_hdbscan/_tree.pyx:580, sklearn/cluster/_hdbscan/_tree.pyx:608, sklearn/cluster/_hdbscan/_tree.pyx:646]
+
+### F3 — `HIERARCHY_t.left_node`/`right_node` are `intp_t` but MST edges are `int64_t`, narrowing on 32-bit
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pxd:34-38 declares `HIERARCHY_t` with `intp_t left_node`/`right_node`; sklearn/cluster/_hdbscan/_linkage.pyx:56-59 declares `MST_edge_t` with `int64_t current_node`/`next_node`; :263-264 assigns `single_linkage[i].left_node = current_node_cluster` and `.right_node = next_node_cluster` where the cluster IDs came from `U.fast_find(current_node)` on a `int64_t current_node`.
+scenario: "Build on a 32-bit platform where `intp_t == int32_t` and `n_samples > 2**31` → silent truncation when storing MST node indices into the HIERARCHY struct."
+contract: `HIERARCHY_t.left_node` and `HIERARCHY_t.right_node` must be widened to `int64_t` (with `HIERARCHY_dtype` updated to `np.int64` correspondingly) to match `MST_edge_t.current_node`/`next_node`.
+instances: [sklearn/cluster/_hdbscan/_tree.pxd:34-38, sklearn/cluster/_hdbscan/_linkage.pyx:56-59, sklearn/cluster/_hdbscan/_linkage.pyx:263-264]
+
+### F4 — `labels_` dtype changes between finite and non-finite input paths
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:822-829 assigns `self.labels_` from `tree_to_labels` (which returns `intp` via `_do_labelling`); sklearn/cluster/_hdbscan/hdbscan.py:840 rebinds `self.labels_ = new_labels` where `new_labels = np.empty(self._raw_data.shape[0], dtype=np.int32)` only in the non-finite branch.
+scenario: "Downstream consumer (or `dbscan_clustering` comparison `self.labels_ == _OUTLIER_ENCODING[…]['label']`) that assumes a stable label dtype → different dtype (`intp`/`int64` vs `int32`) between clean and non-finite fits, producing inconsistent behavior when integrating with typed pipelines or on 32-bit platforms where truncation could occur."
+contract: `HDBSCAN.labels_` must be `np.intp` on every code path.
+instances: single-instance
+
+### F5 — `remap_single_linkage_tree` docstring says `non_finite` is a boolean ndarray but caller passes a `set` of indices
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:364-365 documents `non_finite : ndarray  Boolean array of which entries in the raw data are non-finite`; sklearn/cluster/_hdbscan/hdbscan.py:838 calls it with `non_finite=set(infinite_index + missing_index)` (a `set` of integer indices), and the loop body at :388-391 iterates and uses each element as an integer sample index (`outlier_tree[i] = (outlier, …)`).
+scenario: "External caller relying on the documented contract passes a boolean mask → `enumerate` yields booleans, `outlier` gets written into `left_node` as 0/1 producing corrupt trees; or a future maintainer refactoring on the documented contract silently breaks the current caller."
+contract: The `non_finite` parameter must be typed and documented as an iterable of integer sample indices (the actual usage); the boolean-array wording must be removed.
+instances: single-instance
+
+### F6 — `_do_labelling` compares a numpy array to a scalar with `if`, relying on implicit length-1 truthiness
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:498 assigns `parent_lambda = lambda_array[child_array == n]` (a 1-D ndarray from boolean indexing); :505 executes `if parent_lambda >= threshold:` — the comparison returns an ndarray, and using it in `if` relies on the size being exactly 0 or 1 (numpy raises `ValueError` for size > 1).
+scenario: "A malformed condensed tree where the same child appears in more than one edge (or a maintenance change that removes the single-edge invariant) → `ValueError: The truth value of an array with more than one element is ambiguous.` at runtime instead of a clean type-checked comparison."
+contract: `parent_lambda` must be extracted as a scalar (e.g. via `[0]`) after asserting the mask selects exactly one element, and the comparison must be scalar-to-scalar.
+instances: single-instance
+
+### F7 — `traverse_upwards` assigns numpy arrays to C scalar–typed locals `parent` and `parent_eps`
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:582 declares `cdef cnp.intp_t root, parent` and `cdef cnp.float64_t parent_eps`; :586 assigns `parent = cluster_tree[cluster_tree['child'] == leaf]['parent']` (a 1-D ndarray); :593 assigns `parent_eps = 1 / cluster_tree[cluster_tree['child'] == parent]['value']` (a 1-D ndarray). Both rely on numpy's implicit length-1-array-to-scalar coercion.
+scenario: "A cluster tree in which `cluster_tree['child'] == leaf` selects zero rows (leaf not present) → coercion raises `TypeError: only size-1 arrays can be converted to Python scalars` instead of a clear domain error; more than one row → same failure. Additionally, `parent` is then passed recursively as a `cnp.intp_t` argument, silently discarding array shape."
+contract: The mask must be reduced to a scalar explicitly (e.g. `int(arr[0])` / `float(arr[0])`) with a guard that exactly one row was selected, before assignment to the C scalar locals.
+instances: [sklearn/cluster/_hdbscan/_tree.pyx:586, sklearn/cluster/_hdbscan/_tree.pyx:593]
+
+### F8 — `_get_clusters.child_selection` typed as `uint8_t[::1]` receives an object-dtype ndarray from `==`
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:695 declares `cnp.uint8_t[::1] child_selection`; :729 assigns `child_selection = (cluster_tree['parent'] == node)` — the result of `==` on a structured-field intp array is a numpy `bool_` array (dtype `np.bool_`), not `uint8`, and typed-memoryview assignment from bool dtype to `uint8_t[::1]` is not guaranteed by the buffer protocol.
+scenario: "Cython buffer acquisition on newer numpy/Cython that strictly checks buffer format `?` vs `B` → `ValueError: Buffer dtype mismatch, expected 'unsigned char' but got 'bool'` at runtime on every `fit` that hits the `eom` branch."
+contract: `child_selection` must be typed as a boolean-compatible memoryview (e.g. `cnp.uint8_t[::1]` assigned from `(cluster_tree['parent'] == node).view(np.uint8)`) or declared as `cnp.npy_bool[::1]`, with the assignment made explicit.
+instances: single-instance
+
+### F9 — `_compute_stability.result_pre_dict` typed as memoryview but consumed by `dict()` requiring iterable of pairs
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:246 declares `cnp.float64_t[:, :] result_pre_dict`; :269-274 assigns it via `np.vstack(...).T` and then :276 returns `dict(result_pre_dict)`. `dict()` on a typed memoryview iterates rows as memoryviews, not as 2-tuples, so the conversion depends on the underlying ndarray view being extractable — the memoryview type is documentation drift versus the actual use.
+scenario: "A future Cython version where iterating a 2-D memoryview yields 1-D memoryview rows rather than ndarray rows → `dict()` fails with `TypeError: cannot convert dictionary update sequence element #0 to a sequence`."
+contract: `result_pre_dict` must remain a `cnp.ndarray[cnp.float64_t, ndim=2]` (not a memoryview) since it is passed to `dict()` which relies on numpy row iteration semantics.
+instances: single-instance
+
+### F10 — `bfs_from_cluster_tree.children` typed as `intp_t` but populated from a structured field of `intp_t` via boolean-indexed lookup
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:289 declares `cnp.ndarray[cnp.intp_t, ndim=1] children = condensed_tree['child']` and :286 declares `cnp.ndarray[cnp.intp_t, ndim=1] process_queue = np.array([bfs_root], dtype=np.intp)`; :294 assigns `process_queue = children[np.isin(parents, process_queue)]`. The typed decl at :286 is `cnp.ndarray[cnp.intp_t, …]` but the reassignment does not enforce contiguity or ownership — the previous typed slot is silently rebound to a view.
+scenario: "A caller relying on `process_queue` being a fresh C-contiguous array after the loop → the actual object is a numpy view into `children` with unknown contiguity, breaking any code that would forward it to another `cnp.ndarray[..., mode='c']`-typed parameter."
+contract: The reassignment on :294 must explicitly materialise as `np.ascontiguousarray(...)` or the declared type at :286 must drop the C-contiguity implication.
+instances: single-instance
+
+### F11 — `mst_from_mutual_reachability`'s `mutual_reachability` typed without `mode='c'` while callee assumes row-major access
+severity: low
+evidence: sklearn/cluster/_hdbscan/_linkage.pyx:62 declares `cnp.ndarray[float64_t, ndim=2] mutual_reachability`; the body uses `mutual_reachability[current_node][current_labels]` at :98 — a fancy-indexing row access that only produces a contiguous 1-D view when the source is C-contiguous.
+scenario: "A caller that passes a Fortran-ordered or strided distance matrix (e.g. from `pairwise_distances` with certain metric backends) → correct results but silent memory layout drift; combined with `PyArray_SHAPE(...)[0]` at :87 being used as the "rows" count, a Fortran-ordered input would compute the MST over the transpose axis."
+contract: The parameter must be declared `cnp.ndarray[float64_t, ndim=2, mode='c']` so the C-contiguity is enforced at the API boundary.
+instances: single-instance
+
+### F12 — `n_jobs` default is `4` while `_parameter_constraints` and docstring both say the default is `None` [out-of-theme]
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:486-490 documents `n_jobs : int, default=None`; :640 declares the constraint as `"n_jobs": [Integral, None]`; :658 sets the actual constructor default to `n_jobs=4`.
+scenario: "User relying on the documented `n_jobs=None` (single-thread, joblib backend-controlled) default → HDBSCAN silently uses 4 processes at fit time, producing different resource consumption and, when combined with joblib contexts, unexpected parallelism."
+contract: The `__init__` default must be `n_jobs=None` to match the documented and constrained default.
+instances: single-instance

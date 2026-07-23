@@ -1,0 +1,126 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+module-boundaries-and-placement.md F2: evidence has no file:line anchor
+module-boundaries-and-placement.md F6: evidence has no file:line anchor
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+Acknowledged — legit code. This follows the existing per-estimator branch pattern, so not a boundary issue.
+
+Now I've gathered sufficient evidence. Let me write findings.
+
+### F1 — `_hdbscan` subpackage cimports from parent package's private Cython (leaks internal UnionFind cross-package)
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_linkage.pyx:39 — `from ...cluster._hierarchical_fast cimport UnionFind`; sklearn/cluster/_hierarchical_fast.pxd:3-9 — newly extracted `.pxd` exposes `UnionFind` (with `cdef intp_t next_label`, `cdef intp_t[:] parent`, `cdef intp_t[:] size` and cdef methods `union`/`fast_find`) at the module boundary specifically to satisfy the new subpackage's cimport
+scenario: "The `_hdbscan` subpackage needs a union-find data structure → author extracts a `.pxd` for `_hierarchical_fast` exposing UnionFind's private state (attributes and cdef methods) publicly to the whole tree, promoting an implementation-detail class of the `_agglomerative`/`_hierarchical` code path into a de facto library-wide Cython utility"
+contract: Move the shared `UnionFind` cdef class into a neutral utility module (e.g. `sklearn/utils/_union_find.pxd`) and have both `_hierarchical_fast.pyx` and `_hdbscan/_linkage.pyx` cimport from it, so the sibling subpackage does not depend on internals of another cluster module
+instances: [sklearn/cluster/_hierarchical_fast.pxd:3-9, sklearn/cluster/_hdbscan/_linkage.pyx:39]
+
+### F2 — Tests split across two locations for the same estimator
+severity: low
+evidence: sklearn/cluster/_hdbscan/tests/test_reachibility.py exists (a whole new `tests/` folder inside the private subpackage) while sklearn/cluster/tests/test_hdbscan.py holds all other HDBSCAN tests; every other cluster estimator keeps ALL its tests under `sklearn/cluster/tests/` (see `test_dbscan.py`, `test_hierarchical.py`, `test_optics.py`, etc.) and no other cluster estimator has an internal `tests/` folder
+scenario: "Contributor updates HDBSCAN reachability logic → searches `sklearn/cluster/tests/test_hdbscan.py` for related tests → does not find the reachability tests, which live in the nested `_hdbscan/tests/test_reachibility.py`, so related tests are easily missed / duplicated"
+contract: Consolidate all HDBSCAN tests under `sklearn/cluster/tests/` (e.g. merge `test_reachibility.py` content into a `test_reachability.py` there) following the convention used by every other estimator in `sklearn.cluster`
+instances: [sklearn/cluster/_hdbscan/tests/test_reachibility.py:1, sklearn/cluster/_hdbscan/tests/__init__.py:1, sklearn/cluster/tests/test_hdbscan.py:1]
+
+### F3 — Public-looking helper `remap_single_linkage_tree` at module scope in `hdbscan.py`
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:351 — `def remap_single_linkage_tree(tree, internal_to_raw, non_finite):` is defined without the leading underscore that every other helper in this file uses (`_brute_mst` L82, `_process_mst` L135, `_hdbscan_brute` L158, `_hdbscan_prims` L269, `_get_finite_row_indices` L396, `_OUTLIER_ENCODING` L65); only used internally at L834
+scenario: "The unmarked helper is discoverable via `sklearn.cluster._hdbscan.hdbscan.remap_single_linkage_tree` and looks like a public API → later refactoring assumes external consumers may exist and hesitates to change/remove it, locking in an internal helper's signature"
+contract: Rename to `_remap_single_linkage_tree` to conform to the module's own convention for private helpers
+instances: single-instance
+
+### F4 — `_linkage.pyx` reaches `_tree` symbols via absolute cross-package path instead of local sibling import
+severity: low
+evidence: sklearn/cluster/_hdbscan/_linkage.pyx:40-41 — `from ...cluster._hdbscan._tree cimport HIERARCHY_t` and `from ...cluster._hdbscan._tree import HIERARCHY_dtype`; the same file imports `_typedefs` relatively but reroutes its own sibling `_tree` up three package levels and back down
+scenario: "Package rename or relocation of `_hdbscan` → the absolute path `...cluster._hdbscan._tree` breaks, while a local `from ._tree cimport ...` would remain valid; also obscures the sibling relationship at read time"
+contract: Import the sibling module locally: `from ._tree cimport HIERARCHY_t` and `from ._tree import HIERARCHY_dtype`, matching how `hdbscan.py` (L57-58) imports the same module
+instances: [sklearn/cluster/_hdbscan/_linkage.pyx:40, sklearn/cluster/_hdbscan/_linkage.pyx:41]
+
+### F5 — `.pxd` declares `noexcept` for UnionFind methods but `.pyx` implementation omits it [out-of-theme]
+severity: medium
+evidence: sklearn/cluster/_hierarchical_fast.pxd:8-9 — `cdef void union(self, intp_t m, intp_t n) noexcept` and `cdef intp_t fast_find(self, intp_t n) noexcept`; sklearn/cluster/_hierarchical_fast.pyx:331 — `cdef void union(self, intp_t m, intp_t n):` (no `noexcept`); sklearn/cluster/_hierarchical_fast.pyx:339 — `cdef intp_t fast_find(self, intp_t n):` (no `noexcept`)
+scenario: "Cython 3+ enforces matching exception-handling declarations between `.pxd` and `.pyx` → build fails or emits a signature-mismatch warning; even where it compiles, callers that cimport UnionFind will assume `noexcept` semantics that the implementation does not guarantee, changing exception propagation for downstream users of the newly-exposed class"
+contract: Add `noexcept` to both method definitions in `_hierarchical_fast.pyx` so the implementation matches the `.pxd` declaration
+instances: [sklearn/cluster/_hierarchical_fast.pyx:331, sklearn/cluster/_hierarchical_fast.pyx:339]
+
+### F6 — Test file name typo `test_reachibility.py` misspells "reachability"
+severity: low
+evidence: sklearn/cluster/_hdbscan/tests/test_reachibility.py — filename `test_reachibility.py` while the module under test is `_reachability.py` (also see docstring at line 12: "mutual reachability graph")
+scenario: "Developer runs `pytest -k reachability` looking for the tests of `_reachability.py` → the misspelt file is not matched by the intuitive query and its tests are skipped/undiscovered"
+contract: Rename the file to `test_reachability.py` to match the module it tests
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record, reviewing through ONE assigned theme lens. You are one of several
+mutually-blind reviewers; do not assume anyone else will catch what you skip. Your final
+response text IS the deliverable file — output only the findings document described below.
+
+# Your theme (you OWN this axis)
+
+Theme: module-boundaries-and-placement
+Charter: Logic far from its data, wrong-layer placement, dependency direction, and leaked internals.
+
+Hunt this axis exhaustively across every changed file your theme could plausibly implicate.
+You must still report CRITICAL defects outside your theme that you stumble on — append
+" [out-of-theme]" to the title of any such finding. Do not pad: out-of-theme findings are
+for defects you actually verified while working your own axis.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/PLAN.md
+- Diff manifest: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/DIFF_MANIFEST.md
+- Per-file hunk diffs: /Users/dabs/Development/rh-wt-26385-local/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /Users/dabs/Development/rh-wt-26385-local
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk every changed file your theme could plausibly implicate: read its hunk diff, then
+   open the full file in the worktree and verify what the hunk implies — never trust the
+   hunk alone. `.pyx`/`.pxd` Cython files are first-class changed code; review them as
+   carefully as `.py`.
+4. Review BOTH conformance directions through your theme's lens:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+6. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+The instances line must be EXACTLY one of those two forms — no annotations after
+"single-instance". Number findings sequentially from F1. No preamble, no summary, no
+headings other than the finding blocks, no hedging ("consider possibly" is banned). If you
+genuinely verified there is nothing to report on your axis, output exactly: NO FINDINGS

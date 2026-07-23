@@ -1,0 +1,218 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+readability-and-abstraction.md F8: evidence has no file:line anchor
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+### F1 — `HDBSCAN.n_jobs` default of 4 contradicts docstring saying `None`
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:658 — `__init__` sets `n_jobs=4`; docstring at sklearn/cluster/_hdbscan/hdbscan.py:486-490 states `n_jobs : int, default=None … "None" means 1 unless in a joblib.parallel_backend context.`
+scenario: "User reads docstring expecting joblib-managed default → gets 4 worker processes silently, bypassing joblib.parallel_backend contract and violating sklearn convention"
+contract: The `__init__` default must be `n_jobs=None` to match the documented behavior and sklearn-wide convention.
+instances: single-instance
+
+### F2 — `_hdbscan_brute` default `alpha=None` is a lying signature that would crash if used
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:161 declares `alpha=None`; docstring at 183 says `alpha : float, default=1.0`; body at line 241 executes `distance_matrix /= alpha`, which raises `TypeError` for `None`.
+scenario: "Any caller invoking `_hdbscan_brute(X)` without passing `alpha` → TypeError on in-place division"
+contract: The default must match the documented behavior — set `alpha=1.0` in the signature.
+instances: single-instance
+
+### F3 — `_hdbscan_prims` docstring documents non-existent `copy` parameter
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:313-318 documents `copy : bool, default=False`; the function signature at lines 269-278 has no `copy` parameter, and no `copy` usage inside the function.
+scenario: "User reading the source docstring expects `_hdbscan_prims` to accept `copy` → passes `copy=True` and gets an unexpected TypeError"
+contract: Remove the `copy` parameter section from the `_hdbscan_prims` docstring.
+instances: single-instance
+
+### F4 — `_weighted_cluster_center` docstring name misrepresents medoid computation
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:915-919 — for medoid: `dist_mat = pairwise_distances(data, metric=..., ...); dist_mat = dist_mat * strength; medoid_index = np.argmin(dist_mat.sum(axis=1))`. Here `strength` (`probabilities_[mask]`, shape `(n,)`) broadcasts across columns of `dist_mat`, weighting each source-point's contribution rather than each candidate's — that is neither the traditional medoid nor a standard weighted-medoid definition, yet the method name is `_weighted_cluster_center` and the docstring at line 517 says "the point in the fitted data which minimizes the distance to all other points in the cluster."
+scenario: "User relies on the documented medoid semantics → gets a probability-tilted result that shifts toward points that are far from low-probability samples, without any documentation of that behavior"
+contract: Either drop `strength` from the medoid computation to match the documented "minimizes distance to all other points" definition, or clearly document the weighting scheme.
+instances: single-instance
+
+### F5 — `_weighted_cluster_center` computes `n_clusters` ignoring the `-3` (missing) label but not consistently
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:895 — `n_clusters = len(set(self.labels_) - {-1, -2})`. But `_OUTLIER_ENCODING["missing"]["label"] = -3` (line 74) is a documented outlier label that can appear in `self.labels_` (see lines 843, 957). Because `-3` is not subtracted, `n_clusters` is incorrectly inflated by one when any missing samples are present, producing `centroids_`/`medoids_` arrays that have a spurious last row that is never written to (loop `for idx in range(n_clusters)` iterates 0..n_clusters−1, none of which equal `-3`).
+scenario: "Fit on data with `np.nan` rows and `store_centers='centroid'` → `self.centroids_` has an extra uninitialized row, silently exposing garbage values as a valid centroid"
+contract: Change to `n_clusters = len(set(self.labels_) - set(out['label'] for out in _OUTLIER_ENCODING.values()) - {-1})` (or equivalently subtract `{-1, -2, -3}`).
+instances: single-instance
+
+### F6 — `_compute_stability` allocates and fills `births` twice; first allocation is dead
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:252 `births = np.full(largest_child + 1, np.nan, dtype=np.float64)` and identically at line 254; the value from line 252 is immediately overwritten with no intervening read.
+scenario: "Reader trying to reason about the allocation pattern → confused whether the two allocations are intentional, e.g. some hidden side effect"
+contract: Delete line 252.
+instances: single-instance
+
+### F7 — Misspelled test module filename `test_reachibility.py`
+severity: low
+evidence: sklearn/cluster/_hdbscan/tests/test_reachibility.py:1 — file name misspells "reachability" as "reachibility"; the module under test is `_reachability.pyx`.
+scenario: "Developer greps for `test_reachability` → finds nothing, believes reachability code is untested"
+contract: Rename the file to `test_reachability.py`.
+instances: single-instance
+
+### F8 — Pervasive misspellings in public docstrings ("mututal", "reahability", "collecteion", "smaler", "simbling", "reachibility")
+severity: low
+evidence: multiple docstrings and identifiers, verified via grep:
+- `mututal_reachability_graph` (Returns section label) at sklearn/cluster/_hdbscan/hdbscan.py:91, sklearn/cluster/_hdbscan/_reachability.pyx:76
+- `mutual-reahability` at sklearn/cluster/_hdbscan/hdbscan.py:102, sklearn/cluster/_hdbscan/hdbscan.py:143; sklearn/cluster/_hdbscan/_linkage.pyx:75, sklearn/cluster/_hdbscan/_linkage.pyx:137, sklearn/cluster/_hdbscan/_linkage.pyx:228
+- `collecteion` at sklearn/cluster/_hdbscan/hdbscan.py:103, sklearn/cluster/_hdbscan/hdbscan.py:144; sklearn/cluster/_hdbscan/_linkage.pyx:76, sklearn/cluster/_hdbscan/_linkage.pyx:138, sklearn/cluster/_hdbscan/_linkage.pyx:229
+- `smaler` at sklearn/cluster/_hdbscan/_tree.pyx:133
+- `simbling` at sklearn/cluster/_hdbscan/_tree.pyx:503
+- Cython identifier `mutual_reachibility_distance` at sklearn/cluster/_hdbscan/_reachability.pyx:127, sklearn/cluster/_hdbscan/_reachability.pyx:144, sklearn/cluster/_hdbscan/_reachability.pyx:149, sklearn/cluster/_hdbscan/_reachability.pyx:182, sklearn/cluster/_hdbscan/_reachability.pyx:206, sklearn/cluster/_hdbscan/_reachability.pyx:209, sklearn/cluster/_hdbscan/_reachability.pyx:210
+scenario: "User-visible Sphinx docs render the misspelled Returns label and prose → damages perceived quality of the new estimator"
+contract: Fix each misspelling to the correct English form ("mutual", "reachability", "collection", "smaller", "sibling").
+instances: [sklearn/cluster/_hdbscan/hdbscan.py:91, sklearn/cluster/_hdbscan/hdbscan.py:102, sklearn/cluster/_hdbscan/hdbscan.py:103, sklearn/cluster/_hdbscan/hdbscan.py:143, sklearn/cluster/_hdbscan/hdbscan.py:144, sklearn/cluster/_hdbscan/_linkage.pyx:75, sklearn/cluster/_hdbscan/_linkage.pyx:76, sklearn/cluster/_hdbscan/_linkage.pyx:137, sklearn/cluster/_hdbscan/_linkage.pyx:138, sklearn/cluster/_hdbscan/_linkage.pyx:228, sklearn/cluster/_hdbscan/_linkage.pyx:229, sklearn/cluster/_hdbscan/_reachability.pyx:76, sklearn/cluster/_hdbscan/_reachability.pyx:127, sklearn/cluster/_hdbscan/_reachability.pyx:144, sklearn/cluster/_hdbscan/_reachability.pyx:149, sklearn/cluster/_hdbscan/_reachability.pyx:182, sklearn/cluster/_hdbscan/_reachability.pyx:206, sklearn/cluster/_hdbscan/_reachability.pyx:209, sklearn/cluster/_hdbscan/_reachability.pyx:210, sklearn/cluster/_hdbscan/_tree.pyx:133, sklearn/cluster/_hdbscan/_tree.pyx:503]
+
+### F9 — `_do_labelling` binds `root_cluster` to what is actually the sample count, then uses it to allocate the labels array
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:480-481 — `root_cluster = np.min(parent_array); result = np.empty(root_cluster, dtype=np.intp)`. In the condensed tree convention, `np.min(parent_array)` equals `n_samples` (the smallest cluster label / root cluster id); the code relies on this identity to size the per-sample result array but names it `root_cluster`, making the correctness argument invisible.
+scenario: "Later maintainer refactors parent-numbering scheme → the `root_cluster` name gives no hint that this is doubling as `n_samples`, leading to a silently wrong result-array size"
+contract: Introduce an explicit `n_samples = root_cluster` (or equivalent name) and use it for the allocation with a comment that pins the invariant.
+instances: single-instance
+
+### F10 — `_do_labelling` uses implicitly-typed Python objects `label` and `parent_lambda` inside a hot `cdef` loop
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:492-508 — `label = NOISE`, `parent_lambda = lambda_array[child_array == n]`, and `if parent_lambda >= threshold:` are all untyped in the `cdef` block at line 467-474. `label` therefore boxes each per-sample write; `parent_lambda` is a numpy array compared with a scalar via `>=` — this yields a numpy bool array whose truthiness in an `if` triggers a `DeprecationWarning`/future error for non-length-1 arrays.
+scenario: "Under `allow_single_cluster=True` with a condensed tree where the same `child==n` appears twice → `parent_lambda` becomes length-2 and `if parent_lambda >= threshold` raises `ValueError: The truth value of an array with more than one element is ambiguous`"
+contract: Declare `cdef cnp.intp_t label` and extract a scalar for `parent_lambda` (e.g. `parent_lambda = lambda_array[child_array == n][0]`) with the length-1 assumption made explicit.
+instances: single-instance
+
+### F11 — `remap_single_linkage_tree` iterates a `set` for positional assignment
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:388 — `for i, outlier in enumerate(non_finite):` where `non_finite` is passed as `set(infinite_index + missing_index)` (line 838). Sets have no defined iteration order across Python runs; the loop writes rows in that order and assigns `last_cluster_id += 1` / `last_cluster_size += 1` per row, so the encoded merge order and the row-to-sample mapping are non-deterministic across processes.
+scenario: "Two runs with `PYTHONHASHSEED` differing → `self._single_linkage_tree_` has the same rows but in different order, so any downstream code that indexes by row position produces different results"
+contract: Convert to a sorted list before iteration, e.g. `for i, outlier in enumerate(sorted(non_finite)):`, and change the parameter contract to accept an ordered container.
+instances: single-instance
+
+### F12 — `_get_finite_row_indices` scans `matrix.tolil().data` which only reports *stored* entries for sparse input
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:401-404 — `row_indices = np.array([i for i, row in enumerate(matrix.tolil().data) if np.all(np.isfinite(row))])`. `.tolil().data[i]` contains only the explicitly-stored values of row `i`; explicit `nan` or `inf` values held in a CSR with a zeroed structural slot would still be caught, but the docstring at line 397-400 claims "purely finite rows" — the name and docstring imply structural completeness the implementation does not check.
+scenario: "Sparse matrix with `nan` explicitly stored on the diagonal → row correctly flagged non-finite; but caller who expects the function to also flag rows that were dropped to a structural zero because of an in-place nan-elimination step gets a false 'finite' verdict"
+contract: Qualify the docstring to say "purely finite among *stored* entries" so the name matches the implementation.
+instances: single-instance
+
+### F13 — `HDBSCAN.fit` sets `self._raw_data = X` before dropping non-finite rows, silently exposing pre-validation data as a private attribute
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:707 stores the validated-but-still-non-finite X as `self._raw_data`; downstream code at lines 840, 846 uses `self._raw_data.shape[0]` to size relabelled outputs. Name suggests "raw" but it is post-`_validate_data`, and it is set only on the non-precomputed branch (undefined on the precomputed branch).
+scenario: "Third-party subclass that accesses `self._raw_data` after `fit(X, metric='precomputed')` → AttributeError"
+contract: Always set `self._raw_data` in `fit` (with a comment about scope) so the attribute is defined on every code path.
+instances: single-instance
+
+### F14 — `TreeUnionFind.find` overwrites `is_component` with `False` for every non-root node but nothing reads it
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:337 initializes `self.is_component = np.ones(size, dtype=np.uint8)`, and line 355 sets `self.is_component[x] = False` during path compression, yet `is_component` is never read anywhere in `_tree.pyx` (verified by grep of the file). This is speculative abstraction that also introduces a surprising side effect in an otherwise-pure `find`.
+scenario: "Reader assumes `is_component` is load-bearing → wastes time tracing state that never influences output"
+contract: Remove the `is_component` field and its side-effect write in `find`.
+instances: single-instance
+
+### F15 — `bfs_from_hierarchy` returns internal nodes offset by `-n_samples` interleaved with raw sample ids
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:99-103 — `process_queue = [x - n_samples for x in process_queue if x >= n_samples]` mutates `process_queue` from "tree indexes" to "hierarchy row indexes" mid-iteration, but the earlier `result.extend(process_queue)` at line 96 stored the un-offset values. Callers therefore receive a mixed list where entries `>= n_samples` are original tree ids and entries `< n_samples` are leaf sample ids; the "internal" indices used inside the loop are silently converted. No docstring warns of this dual coordinate system.
+scenario: "Maintainer relies on the return being uniform tree-space ids → indexes `hierarchy[node - n_samples]` for leaves and gets a negative index / silent misread"
+contract: Document (or explicitly convert) the mixed-coordinate return; e.g. "returned nodes are in tree-index space (leaf ids in `[0, n_samples)`, cluster ids in `[n_samples, 2*n_samples-1]`)".
+instances: single-instance
+
+### F16 — `_weighted_cluster_center` allocates `mask` before the loop, then immediately rebinds it
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:896 `mask = np.empty((X.shape[0],), dtype=np.bool_)` is never read; line 908 `mask = self.labels_ == idx` rebinds every iteration.
+scenario: "Reader wonders whether the pre-allocation is used as an out-parameter for a Cython routine → wasted analysis"
+contract: Delete line 896.
+instances: single-instance
+
+### F17 — `traverse_upwards` assigns a numpy array result to a `cnp.intp_t` scalar
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:586 — `parent = cluster_tree[cluster_tree['child'] == leaf]['parent']` is a 1-D numpy array (of length 1 in the well-formed case) but the `cdef` at line 582 types `parent` as `cnp.intp_t`. Similarly line 593 `parent_eps = 1 / cluster_tree[cluster_tree['child'] == parent]['value']` produces a length-1 array assigned to `cnp.float64_t`. Cython auto-unboxes only when the length is exactly 1; if a malformed tree yields zero or multiple matches (e.g. duplicate `child` rows), the unbox raises or silently coerces the wrong element.
+scenario: "Any condensed tree containing two rows with the same `child` field → auto-unbox raises `TypeError: only length-1 arrays can be converted to Python scalars`, aborting `fit`"
+contract: Extract the scalar explicitly, e.g. `parent = int(cluster_tree[cluster_tree['child'] == leaf]['parent'][0])`, and assert the length-1 invariant.
+instances: [sklearn/cluster/_hdbscan/_tree.pyx:586, sklearn/cluster/_hdbscan/_tree.pyx:593]
+
+### F18 — `_get_clusters` uses `@cython.wraparound(True)` for the entire function, silently disabling a fast-path optimization
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:641 — `@cython.wraparound(True)` applied at function scope while the file has no module-level `wraparound(False)`; the decorator is only necessary for the single `node_list[-1]` access at line 724. Applying it at function scope makes every array read pay the wraparound overhead and hides which line actually needs negative indexing.
+scenario: "Future maintainer removes the `[-1]` use → the decorator survives as cargo-cult noise, silently preventing later `wraparound(False)` optimizations"
+contract: Replace the function-scope decorator with a `with cython.wraparound(True):` block around the single `node_list[-1]` access.
+instances: single-instance
+
+### F19 — `dbscan_clustering` docstring promises `-3` handling that the code never performs [out-of-theme]
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:955-958 documents that returned labels include "-3" for missing samples; lines 960-969 compute `labels = labelling_at_cut(self._single_linkage_tree_, cut_distance, min_cluster_size)`, whose result has length `n_samples` of the tree *including* any remapped outlier rows (via `remap_single_linkage_tree`), then overwrites `labels[missing_index]` with `-3` and `labels[infinite_index]` with `-2` using boolean masks derived from `self.labels_`. But `labels` from `labelling_at_cut` has length equal to the tree's `n_samples`, which after remapping equals `self._raw_data.shape[0]` — this coincidence is undocumented and unenforced; if `fit` was called with `metric='precomputed'`, no remap happens, `_raw_data` is undefined, and this method still runs — but `self.labels_` was never populated with `-3`, so the missing/infinite overwrites become no-ops silently.
+scenario: "User calls `fit` with `metric='precomputed'` then `dbscan_clustering(...)` → returned labels do not contain the `-3` value the docstring promises for missing samples"
+contract: Explicitly propagate missing-sample state independent of `self.labels_` so `dbscan_clustering` always emits `-3` where the docstring promises it.
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record, reviewing through ONE assigned theme lens. You are one of several
+mutually-blind reviewers; do not assume anyone else will catch what you skip. Your final
+response text IS the deliverable file — output only the findings document described below.
+
+# Your theme (you OWN this axis)
+
+Theme: readability-and-abstraction
+Charter: Lying names, convoluted logic, speculative abstraction, and surprising side effects.
+
+Hunt this axis exhaustively across every changed file your theme could plausibly implicate.
+You must still report CRITICAL defects outside your theme that you stumble on — append
+" [out-of-theme]" to the title of any such finding. Do not pad: out-of-theme findings are
+for defects you actually verified while working your own axis.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/PLAN.md
+- Diff manifest: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/DIFF_MANIFEST.md
+- Per-file hunk diffs: /Users/dabs/Development/rh-wt-26385-local/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /Users/dabs/Development/rh-wt-26385-local
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk every changed file your theme could plausibly implicate: read its hunk diff, then
+   open the full file in the worktree and verify what the hunk implies — never trust the
+   hunk alone. `.pyx`/`.pxd` Cython files are first-class changed code; review them as
+   carefully as `.py`.
+4. Review BOTH conformance directions through your theme's lens:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+6. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+The instances line must be EXACTLY one of those two forms — no annotations after
+"single-instance". Number findings sequentially from F1. No preamble, no summary, no
+headings other than the finding blocks, no hedging ("consider possibly" is banned). If you
+genuinely verified there is nothing to report on your axis, output exactly: NO FINDINGS

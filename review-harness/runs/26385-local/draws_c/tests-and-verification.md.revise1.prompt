@@ -1,0 +1,186 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+tests-and-verification.md F1: missing scenario: "..." line
+tests-and-verification.md F2: missing scenario: "..." line
+tests-and-verification.md F3: missing scenario: "..." line
+tests-and-verification.md F4: missing scenario: "..." line
+tests-and-verification.md F5: missing scenario: "..." line
+tests-and-verification.md F6: missing scenario: "..." line
+tests-and-verification.md F7: missing scenario: "..." line
+tests-and-verification.md F8: missing scenario: "..." line
+tests-and-verification.md F9: missing scenario: "..." line
+tests-and-verification.md F10: missing scenario: "..." line
+tests-and-verification.md F11: missing scenario: "..." line
+tests-and-verification.md F12: missing scenario: "..." line
+tests-and-verification.md F13: missing scenario: "..." line
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+None of the internal helpers `traverse_upwards`, `epsilon_search`, `get_cluster_tree_leaves`, `recurse_leaf_dfs`, `labelling_at_cut` are tested directly (though some via public API). `labelling_at_cut` is used only in `dbscan_clustering` (indirectly tested).
+
+Now I have enough to compile my findings.
+
+### F1 — `test_labelling_thresholding` only asserts noise counts, not label identities
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:519-520,532-533 — `num_noise = condensed_tree["value"] < 1; assert sum(num_noise) == sum(labels == -1)` and the analogous `num_noise = condensed_tree["value"] < MAX_LAMBDA; assert sum(num_noise) == sum(labels == -1)`
+scenario: A regression in `_do_labelling` that misassigns which specific points are noise (e.g., swaps assignments between siblings, or marks the wrong children below/above threshold) → count of noise labels can remain identical while individual per-point labels are wrong, so the test still passes and the regression escapes.
+contract: Assert the exact per-sample label array (e.g., `assert_array_equal(labels, expected_labels)` where `expected_labels` is derived independently from the thresholding rule), not just the sum of noise labels.
+instances: single-instance
+
+### F2 — `set(missing_labels_idx + infinite_labels_idx)` uses numpy broadcasting, not concatenation
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:212 — `clean_idx = list(set(range(200)) - set(missing_labels_idx + infinite_labels_idx))` where both operands are `np.flatnonzero(...)` results (ndarrays). With `missing_labels_idx = [2, 5]` and `infinite_labels_idx = [0]`, the `+` broadcasts the length-1 array over the length-2 array, producing `[2, 5]` instead of the intended concatenation `[2, 5, 0]`. Confirmed by running `np.array([2,5]) + np.array([0])` → `[2, 5]`.
+scenario: Infinite-outlier index 0 is never removed from `clean_idx` → `clean_model.fit(X_outlier[clean_idx])` is fit on data that still contains an `np.inf` row → the “clean vs full” equivalence assertion (`assert_array_equal(clean_labels, labels[clean_idx])`) does not actually verify what the test docstring claims (that removing outliers upfront yields the same labels for the finite points). The test will silently miss regressions in the finite-only path any time infinite outliers exist.
+contract: Concatenate with `np.concatenate([missing_labels_idx, infinite_labels_idx])` (or use lists and `+`) before wrapping in `set(...)`.
+instances: single-instance
+
+### F3 — `test_hdbscan_precomputed_non_brute` asserts against non-existent algorithm names
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:282 — `hdb = HDBSCAN(metric="precomputed", algorithm=f"prims_{tree}tree")`. The `algorithm` parameter is constrained to `{"auto", "brute", "kdtree", "balltree"}` (sklearn/cluster/_hdbscan/hdbscan.py:629-638), so the ValueError raised is the generic parameter-validation error for an invalid string, not the "precomputed + tree-based algorithm" incompatibility the docstring claims to test. The code path in `fit` that would actually raise for precomputed+tree lives at hdbscan.py:786-791 (`raise ValueError("Sparse data matrices only support algorithm `brute`.")`, and the earlier tree-metric validity checks) and is never exercised by this test.
+scenario: A regression that lets `algorithm="kdtree"` or `algorithm="balltree"` be silently combined with `metric="precomputed"` (removing the intended guard) → test still passes because it never actually feeds a valid tree-algorithm name paired with precomputed.
+contract: Parametrize over the actual valid names (`"kdtree"`, `"balltree"`), and assert on the specific error message emitted by the precomputed+tree guard.
+instances: single-instance
+
+### F4 — `test_hdbscan_centers` uses `rtol=1` (100 % relative tolerance)
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:319-320 — `assert_allclose(center, centroid, rtol=1, atol=0.05); assert_allclose(center, medoid, rtol=1, atol=0.05)`. With `rtol=1`, any value within a factor of two of the truth (plus `atol=0.05`) passes; e.g. `assert_allclose(3.0, 5.9, rtol=1, atol=0.05)` succeeds.
+scenario: A regression that shifts computed centroids/medoids by up to ~100 % of the target value → test still passes, so the "centers are ... accurate to the data" claim in the docstring is not actually enforced.
+contract: Use a small tolerance appropriate for the well-separated blobs used (e.g. `rtol=0.05, atol=0.05`) so that meaningful drift is caught.
+instances: single-instance
+
+### F5 — `max_cluster_size` parameter is entirely untested
+severity: medium
+evidence: No occurrences of `max_cluster_size` in sklearn/cluster/tests/test_hdbscan.py (grep result: 0). The parameter is a documented public constraint (sklearn/cluster/_hdbscan/hdbscan.py:622-625) that changes `_get_clusters` behavior (sklearn/cluster/_hdbscan/_tree.pyx:733: `if subtree_stability > stability[node] or cluster_sizes[node] > max_cluster_size:`).
+scenario: A regression in the `max_cluster_size` branch of `_get_clusters` (e.g., off-by-one, dropped check, wrong comparison direction) → no test fails, feature ships broken.
+contract: Add a dedicated test that constructs data where `max_cluster_size` demonstrably subdivides an otherwise-selected cluster, asserting the resulting number/size of clusters.
+instances: single-instance
+
+### F6 — `cluster_selection_method="leaf"` code path is untested
+severity: medium
+evidence: No test in sklearn/cluster/tests/test_hdbscan.py sets `cluster_selection_method="leaf"` (grep shows only two uses, both `"eom"`, at lines 340 and 354). The `"leaf"` branch is a substantial documented alternative in sklearn/cluster/_hdbscan/_tree.pyx:761-782 and is a legal option per `_parameter_constraints` (hdbscan.py:641).
+scenario: A regression in the `"leaf"` branch of `_get_clusters` (or in `get_cluster_tree_leaves` / `recurse_leaf_dfs`) → all tests continue to pass because none exercise this branch.
+contract: Add a test using `cluster_selection_method="leaf"` that asserts the produced clustering matches an independently-known leaf clustering for a controlled dataset.
+instances: single-instance
+
+### F7 — `store_centers="centroid"` and `store_centers="medoid"` (single-mode) branches are untested
+severity: low
+evidence: sklearn/cluster/tests/test_hdbscan.py:316,323 — only `store_centers="both"` is tested. The `_weighted_cluster_center` code (sklearn/cluster/_hdbscan/hdbscan.py:897-921) has separate `make_centroids` and `make_medoids` flags whose independent behavior (i.e., not setting the other attribute) is unverified.
+scenario: A regression that always sets both attributes regardless of `store_centers`, or one that fails to allocate one of the attributes when only that mode is requested → not caught.
+contract: Parametrize the centers test over `store_centers in {"centroid", "medoid", "both"}` and additionally assert that the un-requested attribute is not set.
+instances: single-instance
+
+### F8 — Test filename typo: `test_reachibility.py` for module `_reachability.pyx`
+severity: low
+evidence: sklearn/cluster/_hdbscan/tests/test_reachibility.py — filename is `reachibility` (misspelled), but it tests functions from `_reachability.pyx` (correctly spelled). The docstring at line 30 also spells `mutual_reachibility_distance`, and _reachability.pyx:127,144,182,206 use `mutual_reachibility_distance` — the misspelling propagates into implementation variable names too, but the test file's name is the surfaced defect for tests-and-verification.
+scenario: Grep/discoverability workflows that search by module basename (`reachability`) miss the test file entirely; contributors may add duplicate tests elsewhere or believe the module is untested.
+contract: Rename `test_reachibility.py` to `test_reachability.py` so the test file name matches the module it tests.
+instances: single-instance
+
+### F9 — `dbscan_clustering(min_cluster_size=…)` parameter is untested
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:923-970 defines `dbscan_clustering(self, cut_distance, min_cluster_size=5)`. In sklearn/cluster/tests/test_hdbscan.py:186 and 204, `dbscan_clustering` is only ever called with `cut_distance=...` — no test varies `min_cluster_size`, so the internal filtering `if cluster_size[cluster] < min_cluster_size:` in `labelling_at_cut` (sklearn/cluster/_hdbscan/_tree.pyx:419-420) is not exercised through this public entry point.
+scenario: A regression to the `min_cluster_size` handling in `labelling_at_cut` (e.g., wrong comparison, dropped filter) → the `dbscan_clustering` output silently returns clusters below the requested minimum size, uncaught by tests.
+contract: Add a test that calls `dbscan_clustering(cut_distance=..., min_cluster_size=k)` and asserts every non-noise cluster in the result has size ≥ k.
+instances: single-instance
+
+### F10 — `test_hdbscan_min_cluster_size` filters only `-1`, not the other outlier labels
+severity: low
+evidence: sklearn/cluster/tests/test_hdbscan.py:259-263 — `true_labels = [label for label in labels if label != -1]; if len(true_labels) != 0: assert np.min(np.bincount(true_labels)) >= min_cluster_size`. `_OUTLIER_ENCODING` (hdbscan.py:65-79) also emits labels `-2` and `-3`. On finite `X` those labels don't appear, but the pattern is brittle and, more importantly, misses the guarantee for any data path that produces non-finite outliers.
+scenario: If this test is extended (or copy-pasted) to data with `np.inf`/`np.nan`, `np.bincount` on a list containing `-2`/`-3` raises `ValueError: 'list' argument must have no negative elements` → the test cannot correctly enforce the `min_cluster_size` invariant on outlier-bearing data.
+contract: Filter with `label not in OUTLIER_SET` (already defined at line 37) instead of hardcoding `label != -1`.
+instances: single-instance
+
+### F11 — `n_jobs` parameter is set but never verified to affect parallelism or correctness
+severity: low
+evidence: `n_jobs` defaults to `4` in `HDBSCAN.__init__` (sklearn/cluster/_hdbscan/hdbscan.py:658). No test in sklearn/cluster/tests/test_hdbscan.py sets `n_jobs` (grep count: 0). The parameter is forwarded into `pairwise_distances` and `NearestNeighbors` calls but its behavior (including e.g., `n_jobs=-1`, `n_jobs=1`) is untested for label-equivalence.
+scenario: A regression in the `n_jobs` handoff (e.g., wrong forwarding, non-deterministic tie-breaking under parallelism) → not caught.
+contract: Add a parametrized test asserting `HDBSCAN(n_jobs=1).fit_predict(X) == HDBSCAN(n_jobs=-1).fit_predict(X)`.
+instances: single-instance
+
+### F12 — `copy=True` behavior is only verified against `metric="precomputed"`, not against the brute/sparse branches
+severity: low
+evidence: sklearn/cluster/tests/test_hdbscan.py:79-88 — `HDBSCAN(metric="precomputed", copy=True).fit_predict(D); assert_allclose(D, D_original)`. The docstring for `copy` (hdbscan.py:521-526) states it applies to precomputed dense/CSR-sparse inputs when `algorithm="brute"`. The sparse `copy=True` path (which triggers a distinct code path via `_brute_mst` and in-place `_sparse_mutual_reachability_graph`) is not tested for immutability of the caller's data.
+scenario: A regression that mutates a caller's CSR precomputed sparse matrix even under `copy=True` → uncaught, silent data corruption for users.
+contract: Extend the copy test to cover sparse CSR precomputed inputs, asserting the caller's sparse array remains unchanged after `fit_predict`.
+instances: single-instance
+
+### F13 — `test_hdbscan_no_clusters` only checks the cluster count, not that all points are noise-labeled
+severity: low
+evidence: sklearn/cluster/tests/test_hdbscan.py:249-251 — `labels = HDBSCAN(min_cluster_size=len(X) - 1).fit_predict(X); n_clusters = len(set(labels) - OUTLIER_SET); assert n_clusters == 0`. This passes as long as no non-outlier label is produced, but says nothing about whether points receive the expected noise label (`-1`) versus, e.g., all being mislabeled as `-2`/`-3` (which are in OUTLIER_SET and thus subtracted).
+scenario: A regression that mislabels all points as `-2` (infinite) or `-3` (missing) on finite data → the "no clusters" test still passes; users get incorrect outlier semantics.
+contract: Additionally assert `np.all(labels == -1)` for finite input when the min_cluster_size guarantees no cluster.
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record, reviewing through ONE assigned theme lens. You are one of several
+mutually-blind reviewers; do not assume anyone else will catch what you skip. Your final
+response text IS the deliverable file — output only the findings document described below.
+
+# Your theme (you OWN this axis)
+
+Theme: tests-and-verification
+Charter: Weakened expectations, tests that assert constants or their own literals, untested new code, and stale tests.
+
+Hunt this axis exhaustively across every changed file your theme could plausibly implicate.
+You must still report CRITICAL defects outside your theme that you stumble on — append
+" [out-of-theme]" to the title of any such finding. Do not pad: out-of-theme findings are
+for defects you actually verified while working your own axis.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/PLAN.md
+- Diff manifest: /Users/dabs/Development/scikit-learn/review-harness/runs/26385-local/DIFF_MANIFEST.md
+- Per-file hunk diffs: /Users/dabs/Development/rh-wt-26385-local/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /Users/dabs/Development/rh-wt-26385-local
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk every changed file your theme could plausibly implicate: read its hunk diff, then
+   open the full file in the worktree and verify what the hunk implies — never trust the
+   hunk alone. `.pyx`/`.pxd` Cython files are first-class changed code; review them as
+   carefully as `.py`.
+4. Review BOTH conformance directions through your theme's lens:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+6. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+The instances line must be EXACTLY one of those two forms — no annotations after
+"single-instance". Number findings sequentially from F1. No preamble, no summary, no
+headings other than the finding blocks, no hedging ("consider possibly" is banned). If you
+genuinely verified there is nothing to report on your axis, output exactly: NO FINDINGS

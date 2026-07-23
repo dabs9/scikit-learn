@@ -1,0 +1,80 @@
+I notice trailing whitespace stripping in `clustering.rst` — lines 399, 419, 422, 428 changes are only whitespace deletions unrelated to HDBSCAN. This is unrelated bundling.
+
+I have enough evidence for findings. Let me compile.
+
+### F1 — Duplicate `births` allocation in `_compute_stability` (dead line)
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:252-254 — two consecutive identical statements `births = np.full(largest_child + 1, np.nan, dtype=np.float64)` on lines 252 and 254 with nothing between them; the first allocation is discarded without being read.
+scenario: "Reading _compute_stability → maintainers waste effort tracing what the two identical allocations are meant to differ by; a small wasted array allocation on every call"
+contract: Delete the redundant line 252 assignment; keep only the single allocation before the loop populates `births`.
+instances: single-instance
+
+### F2 — `plot_hdbscan.py` scale-invariance demo never scales the data
+severity: high
+evidence: examples/cluster/plot_hdbscan.py:106-110 — `for idx, scale in enumerate((1, 0.5, 3)): hdb.fit(X); plot(X, hdb.labels_, ...)` uses `scale` only in the plot title; `X` is neither multiplied by `scale` on `fit` nor on `plot`, unlike the DBSCAN loop above (line 93-95) which does `dbs.fit(X * scale)` and `plot(X * scale, ...)`.
+scenario: "User runs the published example → all three panes show the identical HDBSCAN result on the same unscaled data, so the section titled 'Scale Invariance' visually 'proves' scale invariance by never varying scale; the demonstration is meaningless and misleading"
+contract: Use `hdb.fit(X * scale)` and `plot(X * scale, hdb.labels_, ...)` inside the loop, mirroring the DBSCAN loop that immediately precedes it.
+instances: single-instance
+
+### F3 — `test_hdbscan_precomputed_non_brute` exercises invalid algorithm names, not the intended path [out-of-theme]
+severity: high
+evidence: sklearn/cluster/tests/test_hdbscan.py:282 — `hdb = HDBSCAN(metric="precomputed", algorithm=f"prims_{tree}tree")` constructs `"prims_kdtree"` / `"prims_balltree"`, but the estimator's `_parameter_constraints["algorithm"]` in sklearn/cluster/_hdbscan/hdbscan.py:635-644 is `StrOptions({"auto", "brute", "kdtree", "balltree"})`. The test asserts `pytest.raises(ValueError)`, so it passes — but on the parameter-validation error, never reaching the precomputed+tree combination the test docstring claims to guard.
+scenario: "Someone regresses the precomputed+kdtree / precomputed+balltree guard in HDBSCAN.fit → this test still passes because any invalid string will raise ValueError during `_validate_params`; the regression ships"
+contract: Replace the algorithm name with a valid value (`"kdtree"` / `"balltree"`) so the test drives the actual code path the docstring claims to cover, and match the specific error message from the fit-time guard.
+instances: single-instance
+
+### F4 — `test_dbscan_clustering_outlier_data` uses numpy `+` where set-union of indices is intended [out-of-theme]
+severity: high
+evidence: sklearn/cluster/tests/test_hdbscan.py:212 — `clean_idx = list(set(range(200)) - set(missing_labels_idx + infinite_labels_idx))`. `missing_labels_idx` is a `np.ndarray` (e.g. `[2, 5]` from `np.flatnonzero`) and `infinite_labels_idx` is an ndarray (e.g. `[0]`). `+` on two ndarrays broadcasts elementwise (giving `[2, 5]` here), it does not concatenate, so index `0` is silently dropped from the exclusion set.
+scenario: "The test runs with these fixed arrays → index 0 (the sample set to `[np.inf, 1]`) remains in `clean_idx`, so `X_outlier[clean_idx]` still contains a non-finite row and `clean_model.fit` follows a different code path than intended; the assertion may still pass by coincidence but the test does not verify what it claims"
+contract: Concatenate the indices with `np.concatenate([missing_labels_idx, infinite_labels_idx])` (or convert each to a list before `+`), then build the set of exclusions.
+instances: single-instance
+
+### F5 — Dead `mst_func = None` initialization in `HDBSCAN.fit`
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:763 — `mst_func = None`. Every branch below (algorithm in {"kdtree","balltree","brute"} explicit, and every branch of the `auto` else) unconditionally assigns `mst_func`; the initial `None` is never observed.
+scenario: "Reader assumes the None default is meaningful → wastes time verifying every path reassigns; or a future edit adds a branch that fails to assign `mst_func`, and the AttributeError becomes a confusing 'NoneType is not callable' at line 820 instead of a clear NameError"
+contract: Remove the `mst_func = None` line and let missing-branch assignments raise NameError, which is louder and more debuggable.
+instances: single-instance
+
+### F6 — `_hdbscan_prims` documents a `copy` parameter it does not accept
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:269-278 signature has no `copy`; docstring at sklearn/cluster/_hdbscan/hdbscan.py:313-318 describes `copy : bool, default=False`. There is no `copy` in the signature or body of `_hdbscan_prims`.
+scenario: "Contributor reads the docstring and passes `copy=True` → TypeError from `_hdbscan_prims`; or a maintainer copies the docstring elsewhere and propagates the ghost parameter"
+contract: Delete the `copy` paragraph from `_hdbscan_prims`'s docstring; it belongs only on `_hdbscan_brute`.
+instances: single-instance
+
+### F7 — `_hdbscan_brute` default `alpha=None` triggers `TypeError` on `/=`
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:161 declares `alpha=None`; sklearn/cluster/_hdbscan/hdbscan.py:241 unconditionally does `distance_matrix /= alpha`. Called from `HDBSCAN.fit` at line 767 which always passes `alpha=self.alpha` (validated `> 0`), so today the default is unreachable, but the default value is a live foot-gun for any future caller.
+scenario: "New caller invokes `_hdbscan_brute(X)` relying on the documented default `alpha=1.0` → `TypeError: unsupported operand type(s) for /=: 'ndarray' and 'NoneType'` (dense) or scipy `TypeError` (sparse)"
+contract: Change the default to `alpha=1.0` (matching both the docstring at line 183 and the `_hdbscan_prims` sibling default).
+instances: single-instance
+
+### F8 — Unused `uint8_t` cimport in `_tree.pxd`
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pxd:30 — `from ...utils._typedefs cimport intp_t, float64_t, uint8_t`; grep shows only `intp_t` and `float64_t` used in the file. No struct field or declaration uses `uint8_t`.
+scenario: "Cython lint / pre-commit that the PR description explicitly credits for 'trimmed unused variables' should have flagged this dead cimport → the PR claims that hygiene pass; this slipped through"
+contract: Remove `uint8_t` from the cimport list in `_tree.pxd`.
+instances: single-instance
+
+### F9 — Misspelled test module filename `test_reachibility.py`
+severity: low
+evidence: sklearn/cluster/_hdbscan/tests/test_reachibility.py:1 — file name misspells "reachability" as "reachibility" (correct spelling used throughout the docstrings and public API name `mutual_reachability_graph`).
+scenario: "Developer greps for `test_reachability` → misses the tests; future rename requires touching imports / CI / any tooling that references the filename"
+contract: Rename the file to `test_reachability.py`.
+instances: single-instance
+
+### F10 — Unrelated whitespace-only edits bundled into HDBSCAN PR
+severity: low
+evidence: doc/modules/clustering.rst hunk at lines around 395-435 in the diff strips trailing whitespace on Mean-Shift documentation lines (`hill climbing`, `density estimation.`, `is small enough and is`) that are unrelated to HDBSCAN; hunks/doc_modules_clustering.rst.diff:19-45 shows these are pure trailing-space removals in the Mean-Shift section.
+scenario: "Reviewer scanning the diff must verify each unrelated hunk is safe → wastes review time and muddies `git blame` on Mean-Shift docs for a PR whose scope is HDBSCAN"
+contract: Keep whitespace-only cleanups in a separate commit/PR; the HDBSCAN PR should touch clustering.rst only for HDBSCAN content.
+instances: single-instance
+
+### F11 — `HDBSCAN.__init__` default `n_jobs=4` contradicts documented default
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:658 — `n_jobs=4` in the signature; sklearn/cluster/_hdbscan/hdbscan.py:492-496 docstring: "``None`` means 1 unless in a :obj:`joblib.parallel_backend` context." A default of `4` is neither `None` nor matches any other sklearn clusterer (DBSCAN, OPTICS use `n_jobs=None`).
+scenario: "User instantiates `HDBSCAN()` expecting single-threaded behavior per the docs → gets 4-thread parallelism unpredictably; also inconsistent with every other sklearn clusterer's convention"
+contract: Set `n_jobs=None` in the `__init__` signature to match the documented default and sklearn-wide convention.
+instances: single-instance
