@@ -41,6 +41,21 @@ def blocks(text):
         yield m.group(1), text[m.start():end]
 
 
+def _keyed_text(block, key_re):
+    """Value of a keyed line plus continuation lines up to the next key/blank/block."""
+    m = key_re.search(block)
+    if not m:
+        return None
+    lines = [m.group(1)]
+    rest = block[m.end():].splitlines()
+    for line in rest:
+        if re.match(r"^(severity|evidence|scenario|instances|contract):", line) \
+                or line.startswith("### "):
+            break
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def contract_text(block):
     """contract: value plus continuation lines up to the next key or blank."""
     m = CONTRACT_RE.search(block)
@@ -76,11 +91,11 @@ def lint_text(text, label="findings"):
         if not SEVERITY_RE.search(block):
             violations.append(f"{label} {fid}: missing/invalid 'severity:' (high|medium|low)")
 
-        ev = EVIDENCE_RE.search(block)
-        if not ev:
+        ev_text = _keyed_text(block, EVIDENCE_RE)
+        if ev_text is None:
             violations.append(f"{label} {fid}: missing 'evidence:' line")
-        elif not ANCHOR_RE.search(ev.group(1)):
-            violations.append(f"{label} {fid}: evidence has no file:line anchor")
+        elif not ANCHOR_RE.search(ev_text):
+            violations.append(f"{label} {fid}: evidence has no file:line anchor (checked the evidence line and its continuation lines)")
 
         sc = SCENARIO_RE.search(block)
         if not sc:
