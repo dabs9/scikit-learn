@@ -8,7 +8,9 @@ RH=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 ROOT=$(cd "$RH/.." && pwd -P)
 # shellcheck disable=SC1091
 source "$RH/config.env"
-export REVIEW_MODEL MAX_THINKING_TOKENS
+export REVIEW_MODEL
+# only force a thinking budget when one is set; empty = model adaptive default
+if [[ -n "${MAX_THINKING_TOKENS:-}" ]]; then export MAX_THINKING_TOKENS; else unset MAX_THINKING_TOKENS; fi
 
 RUN=$RH/runs/$RUN_LABEL
 MARK=$RUN/markers
