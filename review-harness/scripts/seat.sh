@@ -24,12 +24,13 @@ run_once() {
   fi
   local timer=()
   command -v timeout >/dev/null 2>&1 && timer=(timeout "$TIMEOUT_S")
+  # ${arr[@]+...} guards keep empty arrays legal under set -u on bash 3.2 (macOS)
   if (( attempt % 2 == 1 )); then
-    (cd "$SEATCWD" && "${timer[@]}" claude -p --model "$MODEL" \
-        --allowedTools "$tools" "${flags[@]}" <"$PROMPT") >"$OUT.tmp" 2>>"$LOG"
+    (cd "$SEATCWD" && ${timer[@]+"${timer[@]}"} claude -p --model "$MODEL" \
+        --allowedTools "$tools" ${flags[@]+"${flags[@]}"} <"$PROMPT") >"$OUT.tmp" 2>>"$LOG"
   else
     # alternate permission style in case the worker CLI rejects allowedTools
-    (cd "$SEATCWD" && "${timer[@]}" claude -p --model "$MODEL" \
+    (cd "$SEATCWD" && ${timer[@]+"${timer[@]}"} claude -p --model "$MODEL" \
         --dangerously-skip-permissions <"$PROMPT") >"$OUT.tmp" 2>>"$LOG"
   fi
 }
