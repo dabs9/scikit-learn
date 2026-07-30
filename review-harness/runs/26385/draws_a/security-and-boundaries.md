@@ -1,5 +1,0 @@
-Reviewing this PR through the security-and-boundaries lens: the change adds a clustering estimator that receives numerical arrays (dense/sparse) and returns cluster labels. There is no authn/authz surface, no shell/query/HTML injection surface, no secrets or PII handling, and no external I/O. All caller-supplied data enters via `self._validate_data(...)` (`_hdbscan/hdbscan.py:701-747`) which normalises dtype and sparse format before it reaches the Cython kernels. Callables via `metric=` are the sklearn-standard API contract, not a misplaced trust. The Cython MST/reachability routines operate on already-validated numpy/scipy buffers with bounded indices constructed by the algorithm (e.g. `mst_from_data_matrix` in `_linkage.pyx:141-218` reads `raw_data` via `const` memoryviews and writes only `mst`). The `copy` parameter's in-place mutation semantics on precomputed inputs are documented (`hdbscan.py:521-526`).
-
-No security-and-boundaries defects verified. No verified CRITICAL out-of-theme defects to attach either.
-
-NO FINDINGS

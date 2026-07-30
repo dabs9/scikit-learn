@@ -1,3 +1,0 @@
-Output looks correct. All three files are written with proper structure.
-
-SYNTHESIS DONE
