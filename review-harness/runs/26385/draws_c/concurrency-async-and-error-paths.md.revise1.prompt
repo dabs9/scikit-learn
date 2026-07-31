@@ -1,0 +1,102 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+concurrency-async-and-error-paths.md F3: evidence has no file:line anchor (checked the evidence line and its continuation lines)
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+Now I have enough to report findings. Let me write them up.
+
+### F1 — HDBSCAN default `n_jobs=4` diverges from documented default and defeats joblib.parallel_backend
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:658 — `__init__` signature has `n_jobs=4,`, while the same file's docstring at lines 486–490 states `n_jobs : int, default=None. Number of jobs to run in parallel to calculate distances. None means 1 unless in a joblib.parallel_backend context.` The value propagates verbatim through `kwargs["n_jobs"] = self.n_jobs` (line 769–775) to `pairwise_distances(..., n_jobs=n_jobs, ...)` (line 245) and `NearestNeighbors(..., n_jobs=n_jobs, ...)` (line 341).
+scenario: "user does `with joblib.parallel_backend('loky', n_jobs=1): HDBSCAN().fit(X)` → 4 worker processes still spawn because the concrete `n_jobs=4` is passed through rather than sentinel `None` → resource-oversubscription and behavior contrary to what the docstring promises"
+contract: Change the `__init__` default to `n_jobs=None` so both `pairwise_distances` and `NearestNeighbors` see `None` and respect the joblib parallel backend context, matching the documented contract.
+instances: single-instance
+
+### F2 — Sparse mutual-reachability leaves raw distance when MR is infinite and `max_distance <= 0`
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_reachability.pyx:206–212 — `mutual_reachibility_distance = max(core_distances[row_ind], core_distances[col_ind], data[i]); if isfinite(mutual_reachibility_distance): data[i] = mutual_reachibility_distance; elif max_distance > 0: data[i] = max_distance` (no `else`). Combined with lines 195–200, `core_distances[i] = INFINITY` whenever row `i` has `<= further_neighbor_idx` stored entries. With the caller default `max_distance = metric_params.get("max_distance", 0.0)` (hdbscan.py:249), the `elif` is false and `data[i]` is silently kept at its original raw value instead of INFINITY.
+scenario: "sparse precomputed distance matrix where some row has fewer than min_samples nonzero entries but is not fully isolated (still reachable via other edges); default max_distance=0.0 → those `data[i]` entries retain the original raw distance instead of INF → `csgraph.connected_components` still reports one component (no ValueError raised in `_brute_mst`) → `csgraph.minimum_spanning_tree` picks these bogus low-weight edges → resulting MST/clustering silently uses wrong reachability weights"
+contract: In the `elif` branch write `data[i] = INFINITY` (via `libc.math.INFINITY`) so the sparse matrix consistently reflects the computed mutual-reachability semantics; only override with `max_distance` when the caller explicitly opts in.
+instances: single-instance
+
+### F3 — `_weighted_cluster_center` crashes when non-finite samples exist and `store_centers` is set [out-of-theme]
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py — in `fit`, line 733 rebinds `X = X[finite_index]` (reduced-size feature array) inside the `if not all_finite:` branch; lines 840–844 rebind `self.labels_ = new_labels` at full `self._raw_data.shape[0]`; line 855 then calls `self._weighted_cluster_center(X)` with the reduced X. Inside the helper at lines 907–909, `for idx in range(n_clusters): mask = self.labels_ == idx; data = X[mask]` — `mask` has `self._raw_data.shape[0]` entries while `X.shape[0]` is smaller, so `X[mask]` raises `IndexError: boolean index did not match indexed array along dimension 0`. In addition, line 895 `n_clusters = len(set(self.labels_) - {-1, -2})` fails to subtract `-3` (the missing-sample outlier label), inflating `n_clusters` by 1 whenever missing samples exist.
+scenario: "`HDBSCAN(store_centers='centroid').fit(X)` with any `np.nan`/`np.inf` in `X` → `all_finite` becomes False → after remap, `self.labels_.shape[0] > X.shape[0]` → `_weighted_cluster_center` raises IndexError at the first cluster iteration; user cannot get centroids/medoids for non-finite inputs at all"
+contract: Compute the mask against labels aligned to the reduced `X` (e.g., `mask = self.labels_[finite_index] == idx`, or pass `self._raw_data` to `_weighted_cluster_center` and mask against that), and drop `-3` in addition to `{-1, -2}` when counting non-noise clusters.
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record, reviewing through ONE assigned theme lens. You are one of several
+mutually-blind reviewers; do not assume anyone else will catch what you skip. Your final
+response text IS the deliverable file — output only the findings document described below.
+
+# Your theme (you OWN this axis)
+
+Theme: concurrency-async-and-error-paths
+Charter: Races, resource leaks, cancellation, swallowed errors, fail-open fallthrough, and partial-failure states.
+
+Hunt this axis exhaustively across every changed file your theme could plausibly implicate.
+You must still report CRITICAL defects outside your theme that you stumble on — append
+" [out-of-theme]" to the title of any such finding. Do not pad: out-of-theme findings are
+for defects you actually verified while working your own axis.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /work/review-harness/runs/26385/PLAN.md
+- Diff manifest: /work/review-harness/runs/26385/DIFF_MANIFEST.md
+- Per-file hunk diffs: /tmp/rh-wt-26385/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /tmp/rh-wt-26385
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk every changed file your theme could plausibly implicate: read its hunk diff, then
+   open the full file in the worktree and verify what the hunk implies — never trust the
+   hunk alone. `.pyx`/`.pxd` Cython files are first-class changed code; review them as
+   carefully as `.py`.
+4. Review BOTH conformance directions through your theme's lens:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+6. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+The instances line must be EXACTLY one of those two forms — no annotations after
+"single-instance". Number findings sequentially from F1. No preamble, no summary, no
+headings other than the finding blocks, no hedging ("consider possibly" is banned). If you
+genuinely verified there is nothing to report on your axis, output exactly: NO FINDINGS

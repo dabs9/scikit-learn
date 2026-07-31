@@ -1,0 +1,522 @@
+{
+ "F1": {
+  "theme": "logic-and-correctness",
+  "original_id": "F1"
+ },
+ "F2": {
+  "theme": "logic-and-correctness",
+  "original_id": "F2"
+ },
+ "F3": {
+  "theme": "logic-and-correctness",
+  "original_id": "F3"
+ },
+ "F4": {
+  "theme": "logic-and-correctness",
+  "original_id": "F4"
+ },
+ "F5": {
+  "theme": "logic-and-correctness",
+  "original_id": "F5"
+ },
+ "F6": {
+  "theme": "logic-and-correctness",
+  "original_id": "F6"
+ },
+ "F7": {
+  "theme": "logic-and-correctness",
+  "original_id": "F7"
+ },
+ "F8": {
+  "theme": "security-and-boundaries",
+  "original_id": "F1"
+ },
+ "F9": {
+  "theme": "security-and-boundaries",
+  "original_id": "F2"
+ },
+ "F10": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F1"
+ },
+ "F11": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F2"
+ },
+ "F12": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F3"
+ },
+ "F13": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F4"
+ },
+ "F14": {
+  "theme": "concurrency-async-and-error-paths",
+  "original_id": "F5"
+ },
+ "F15": {
+  "theme": "tests-and-verification",
+  "original_id": "F1"
+ },
+ "F16": {
+  "theme": "tests-and-verification",
+  "original_id": "F2"
+ },
+ "F17": {
+  "theme": "tests-and-verification",
+  "original_id": "F3"
+ },
+ "F18": {
+  "theme": "tests-and-verification",
+  "original_id": "F4"
+ },
+ "F19": {
+  "theme": "tests-and-verification",
+  "original_id": "F5"
+ },
+ "F20": {
+  "theme": "tests-and-verification",
+  "original_id": "F6"
+ },
+ "F21": {
+  "theme": "tests-and-verification",
+  "original_id": "F7"
+ },
+ "F22": {
+  "theme": "tests-and-verification",
+  "original_id": "F8"
+ },
+ "F23": {
+  "theme": "tests-and-verification",
+  "original_id": "F9"
+ },
+ "F24": {
+  "theme": "tests-and-verification",
+  "original_id": "F10"
+ },
+ "F25": {
+  "theme": "tests-and-verification",
+  "original_id": "F11"
+ },
+ "F26": {
+  "theme": "tests-and-verification",
+  "original_id": "F12"
+ },
+ "F27": {
+  "theme": "tests-and-verification",
+  "original_id": "F13"
+ },
+ "F28": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F1"
+ },
+ "F29": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F2"
+ },
+ "F30": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F3"
+ },
+ "F31": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F4"
+ },
+ "F32": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F5"
+ },
+ "F33": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F6"
+ },
+ "F34": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F7"
+ },
+ "F35": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F8"
+ },
+ "F36": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F9"
+ },
+ "F37": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F10"
+ },
+ "F38": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F11"
+ },
+ "F39": {
+  "theme": "type-and-interface-contracts",
+  "original_id": "F12"
+ },
+ "F40": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F1"
+ },
+ "F41": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F2"
+ },
+ "F42": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F3"
+ },
+ "F43": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F4"
+ },
+ "F44": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F5"
+ },
+ "F45": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F6"
+ },
+ "F46": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F7"
+ },
+ "F47": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F8"
+ },
+ "F48": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F9"
+ },
+ "F49": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F10"
+ },
+ "F50": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F11"
+ },
+ "F51": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F12"
+ },
+ "F52": {
+  "theme": "duplication-and-single-sourcing",
+  "original_id": "F13"
+ },
+ "F53": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F1"
+ },
+ "F54": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F2"
+ },
+ "F55": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F3"
+ },
+ "F56": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F4"
+ },
+ "F57": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F5"
+ },
+ "F58": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F6"
+ },
+ "F59": {
+  "theme": "dead-code-and-change-hygiene",
+  "original_id": "F7"
+ },
+ "F60": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F1"
+ },
+ "F61": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F2"
+ },
+ "F62": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F3"
+ },
+ "F63": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F4"
+ },
+ "F64": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F5"
+ },
+ "F65": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F6"
+ },
+ "F66": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F7"
+ },
+ "F67": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F8"
+ },
+ "F68": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F9"
+ },
+ "F69": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F10"
+ },
+ "F70": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F11"
+ },
+ "F71": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F12"
+ },
+ "F72": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F13"
+ },
+ "F73": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F14"
+ },
+ "F74": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F15"
+ },
+ "F75": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F16"
+ },
+ "F76": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F17"
+ },
+ "F77": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F18"
+ },
+ "F78": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F19"
+ },
+ "F79": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F20"
+ },
+ "F80": {
+  "theme": "readability-and-abstraction",
+  "original_id": "F21"
+ },
+ "F81": {
+  "theme": "docs-and-comments",
+  "original_id": "F1"
+ },
+ "F82": {
+  "theme": "docs-and-comments",
+  "original_id": "F2"
+ },
+ "F83": {
+  "theme": "docs-and-comments",
+  "original_id": "F3"
+ },
+ "F84": {
+  "theme": "docs-and-comments",
+  "original_id": "F4"
+ },
+ "F85": {
+  "theme": "docs-and-comments",
+  "original_id": "F5"
+ },
+ "F86": {
+  "theme": "docs-and-comments",
+  "original_id": "F6"
+ },
+ "F87": {
+  "theme": "docs-and-comments",
+  "original_id": "F7"
+ },
+ "F88": {
+  "theme": "docs-and-comments",
+  "original_id": "F8"
+ },
+ "F89": {
+  "theme": "docs-and-comments",
+  "original_id": "F9"
+ },
+ "F90": {
+  "theme": "docs-and-comments",
+  "original_id": "F10"
+ },
+ "F91": {
+  "theme": "docs-and-comments",
+  "original_id": "F11"
+ },
+ "F92": {
+  "theme": "docs-and-comments",
+  "original_id": "F12"
+ },
+ "F93": {
+  "theme": "docs-and-comments",
+  "original_id": "F13"
+ },
+ "F94": {
+  "theme": "docs-and-comments",
+  "original_id": "F14"
+ },
+ "F95": {
+  "theme": "docs-and-comments",
+  "original_id": "F15"
+ },
+ "F96": {
+  "theme": "docs-and-comments",
+  "original_id": "F16"
+ },
+ "F97": {
+  "theme": "docs-and-comments",
+  "original_id": "F17"
+ },
+ "F98": {
+  "theme": "docs-and-comments",
+  "original_id": "F18"
+ },
+ "F99": {
+  "theme": "docs-and-comments",
+  "original_id": "F19"
+ },
+ "F100": {
+  "theme": "docs-and-comments",
+  "original_id": "F20"
+ },
+ "F101": {
+  "theme": "docs-and-comments",
+  "original_id": "F21"
+ },
+ "F102": {
+  "theme": "docs-and-comments",
+  "original_id": "F22"
+ },
+ "F103": {
+  "theme": "docs-and-comments",
+  "original_id": "F23"
+ },
+ "F104": {
+  "theme": "data-access-and-performance",
+  "original_id": "F1"
+ },
+ "F105": {
+  "theme": "data-access-and-performance",
+  "original_id": "F2"
+ },
+ "F106": {
+  "theme": "data-access-and-performance",
+  "original_id": "F3"
+ },
+ "F107": {
+  "theme": "data-access-and-performance",
+  "original_id": "F4"
+ },
+ "F108": {
+  "theme": "data-access-and-performance",
+  "original_id": "F5"
+ },
+ "F109": {
+  "theme": "data-access-and-performance",
+  "original_id": "F6"
+ },
+ "F110": {
+  "theme": "data-access-and-performance",
+  "original_id": "F7"
+ },
+ "F111": {
+  "theme": "data-access-and-performance",
+  "original_id": "F8"
+ },
+ "F112": {
+  "theme": "data-access-and-performance",
+  "original_id": "F9"
+ },
+ "F113": {
+  "theme": "data-access-and-performance",
+  "original_id": "F10"
+ },
+ "F114": {
+  "theme": "data-access-and-performance",
+  "original_id": "F11"
+ },
+ "F115": {
+  "theme": "data-access-and-performance",
+  "original_id": "F12"
+ },
+ "F116": {
+  "theme": "data-access-and-performance",
+  "original_id": "F13"
+ },
+ "F117": {
+  "theme": "data-access-and-performance",
+  "original_id": "F14"
+ },
+ "F118": {
+  "theme": "data-access-and-performance",
+  "original_id": "F15"
+ },
+ "F119": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F1"
+ },
+ "F120": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F2"
+ },
+ "F121": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F3"
+ },
+ "F122": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F4"
+ },
+ "F123": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F5"
+ },
+ "F124": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F6"
+ },
+ "F125": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F7"
+ },
+ "F126": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F8"
+ },
+ "F127": {
+  "theme": "module-boundaries-and-placement",
+  "original_id": "F9"
+ },
+ "F128": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F1"
+ },
+ "F129": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F2"
+ },
+ "F130": {
+  "theme": "build-config-and-operational-wiring",
+  "original_id": "F3"
+ }
+}

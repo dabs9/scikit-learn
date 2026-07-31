@@ -1,0 +1,102 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+logic-and-correctness.md F3: scenario lacks trigger→consequence arrow
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+I've completed my review. The task tool reminder isn't relevant for a focused review task like this.
+
+### F1 — `_weighted_cluster_center` crashes on non-finite input when `store_centers` is set
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:854-855, 907-909 — `fit` passes the finite-subset `X` (shape `(n_finite, n_features)` after `X = X[finite_index]` at line 733) to `_weighted_cluster_center`, but by this point `self.labels_` has been reassigned at line 844 to shape `(n_total,)`. Inside the helper, `mask = self.labels_ == idx` yields a boolean array of size `n_total`, then `data = X[mask]` boolean-indexes X (size `n_finite`) with a mismatched mask.
+scenario: "`HDBSCAN(store_centers='centroid').fit(X)` where `X` contains any `np.nan` or `np.inf` row → `IndexError: boolean index did not match indexed array along dimension 0; dimension is n_finite but corresponding boolean dimension is n_total`"
+contract: Pass `self._raw_data` (full n_total rows) rather than the finite-subset `X` when invoking `self._weighted_cluster_center`, and mask both `self._raw_data` and `self.probabilities_` with the label mask.
+instances: single-instance
+
+### F2 — `_weighted_cluster_center` over-counts clusters by treating missing-data label `-3` as a real cluster
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:895 — `n_clusters = len(set(self.labels_) - {-1, -2})`. `_OUTLIER_ENCODING` defines three outlier labels: -1 (noise), -2 (infinite), -3 (missing). Only -1 and -2 are subtracted, so when `self.labels_` contains any -3 the count is inflated by 1.
+scenario: "Input `X` contains any `np.nan` row, `store_centers='centroid'`; the extra iteration of `for idx in range(n_clusters)` reaches an `idx` no sample carries → `mask` is all-False → `data`/`strength` empty → `np.average(data, weights=strength, axis=0)` raises `ZeroDivisionError: Weights sum to zero, can't be normalized` and `centroids_[idx]` is never assigned"
+contract: Use `set(self.labels_) - {-1, -2, -3}` (or `- set(v['label'] for v in _OUTLIER_ENCODING.values()) - {-1}`) so every outlier label defined in `_OUTLIER_ENCODING` is excluded from the cluster count.
+instances: single-instance
+
+### F3 — `n_jobs` default disagrees with documented default [out-of-theme]
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:658 — `__init__` has `n_jobs=4`, while the class-docstring parameter description at line 486 says "`n_jobs : int, default=None`" and further states "`None` means 1 unless in a `joblib.parallel_backend` context." The signature and the documented API disagree.
+scenario: "User reads the class docstring, expects the default to inherit from a `joblib.parallel_backend` context (or fall back to 1), but `HDBSCAN()` always uses `n_jobs=4`, spawning parallelism the user did not opt into and clashing with the surrounding backend"
+contract: Change the default in `__init__` to `n_jobs=None` to match the documented behavior.
+instances: single-instance
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are an exhaustive senior code reviewer of ONE pull request, judged against its stated
+plan of record, reviewing through ONE assigned theme lens. You are one of several
+mutually-blind reviewers; do not assume anyone else will catch what you skip. Your final
+response text IS the deliverable file — output only the findings document described below.
+
+# Your theme (you OWN this axis)
+
+Theme: logic-and-correctness
+Charter: Wrong values, branches, and boundaries; off-by-one and edge conditions; unhandled cases; missing or wrong input validation.
+
+Hunt this axis exhaustively across every changed file your theme could plausibly implicate.
+You must still report CRITICAL defects outside your theme that you stumble on — append
+" [out-of-theme]" to the title of any such finding. Do not pad: out-of-theme findings are
+for defects you actually verified while working your own axis.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /work/review-harness/runs/26385/PLAN.md
+- Diff manifest: /work/review-harness/runs/26385/DIFF_MANIFEST.md
+- Per-file hunk diffs: /tmp/rh-wt-26385/hunks/  (filename = changed path with '/' replaced by '_', suffix .diff)
+- Worktree checked out at the PR head: /tmp/rh-wt-26385
+- Diff range: 86541f2b3bc8a96264e265cb810cf79858544340..04c8b6954e3e4b8f8af086cea9d386f954b76bfe (git is available in the worktree)
+
+# Method (mandatory, in order)
+
+1. Read the plan of record in full.
+2. Read the diff manifest in full.
+3. Walk every changed file your theme could plausibly implicate: read its hunk diff, then
+   open the full file in the worktree and verify what the hunk implies — never trust the
+   hunk alone. `.pyx`/`.pxd` Cython files are first-class changed code; review them as
+   carefully as `.py`.
+4. Review BOTH conformance directions through your theme's lens:
+   (a) plan requirements the change omits, weakens, or contradicts;
+   (b) changes no part of the plan sanctions.
+5. Deleted code is findings-eligible: when deleted prose/code defined behavior, the finding
+   is the LOST SEMANTICS, not "something was deleted".
+6. Every claim must be verified in the tree before it becomes a finding — cite what you
+   actually saw.
+
+# Calibration
+
+This PR merged after human review, so most true findings are real-but-minor or judgment
+calls. Reserve `high` for concrete, user-visible breakage you verified. A sea of high
+findings signals over-calling: precision matters as much as recall. Report every defect
+you verified, at the severity the evidence supports — nothing hedged, nothing padded.
+
+# Output format — exactly this, nothing else
+
+For each finding:
+
+### F<N> — <one-line title>
+severity: high|medium|low
+evidence: <file>:<line-range> — <what is there, quoted or precisely described>
+scenario: "<trigger> → <consequence>"
+contract: <the single pinned recommendation — no permissive alternatives>
+instances: [<file:line>, <file:line>, ...]  (all occurrences you could find)  OR  instances: single-instance
+
+The instances line must be EXACTLY one of those two forms — no annotations after
+"single-instance". Number findings sequentially from F1. No preamble, no summary, no
+headings other than the finding blocks, no hedging ("consider possibly" is banned). If you
+genuinely verified there is nothing to report on your axis, output exactly: NO FINDINGS

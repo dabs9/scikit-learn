@@ -1,0 +1,69 @@
+### F1 — Documented `n_jobs` default lies about the actual value used
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:486 declares `n_jobs : int, default=None` in the class docstring, but the constructor signature at line 658 uses `n_jobs=4`.
+scenario: "User relies on documented default (`None`, meaning 1 job) → estimator silently spawns up to 4 parallel workers during `pairwise_distances`, oversubscribing in nested parallelism / joblib contexts and contradicting the documented single-threaded behavior"
+contract: Change the constructor default to `n_jobs=None` to match the docstring.
+instances: single-instance
+
+### F2 — Duplicated `births = np.full(...)` allocation is dead code
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:252-254 — line 252 executes `births = np.full(largest_child + 1, np.nan, dtype=np.float64)`, then line 254 (after a blank line) immediately overwrites it with the identical assignment. The first assignment is unconditionally discarded.
+scenario: "Reader tries to understand `_compute_stability` → sees two identical allocations, hunts for a subtle difference, wastes review time; every fit pays for one throwaway numpy array allocation proportional to `largest_child + 1`"
+contract: Delete the redundant `births = np.full(largest_child + 1, np.nan, dtype=np.float64)` on line 252.
+instances: single-instance
+
+### F3 — `_weighted_cluster_center` counts `-3` as a real cluster [out-of-theme]
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:895 computes `n_clusters = len(set(self.labels_) - {-1, -2})`, subtracting only two outlier labels. But `self.labels_` may contain `-3` for missing-data rows (encoded via `_OUTLIER_ENCODING["missing"]["label"]` at line 843), and the class docstring at lines 561-573 explicitly promises "the `-1, -2, -3` labels for the outlier clusters are excluded" from `n_clusters`.
+scenario: "User fits `HDBSCAN(store_centers='centroid')` on data containing `np.nan` rows → `n_clusters` is inflated by 1; the mask/index arithmetic in the loop (`mask = self.labels_ == idx` on line 908) has shape `_raw_data.shape[0]` while `X` passed in on line 855 was already filtered to finite rows (line 733), so `X[mask]` raises IndexError on the shape mismatch"
+contract: Use `n_clusters = len(set(self.labels_) - {-1, -2, -3})` and filter `self.labels_` to the finite subset before masking so shapes align with the filtered `X`.
+instances: single-instance
+
+### F4 — `TreeUnionFind.is_component` is written but never read
+severity: medium
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:330 declares `cdef cnp.uint8_t[::1] is_component`; line 337 initializes it; line 355 writes `self.is_component[x] = False` inside `find`; no reader anywhere in the codebase (`grep is_component sklearn/cluster` returns only these three write/init sites).
+scenario: "Reader of `TreeUnionFind.find` sees a boolean-side-effect write and assumes the flag matters for correctness, spends time reasoning about it → the flag has zero observable effect; every path-compressing call also pays for a memoryview store that only exists as noise"
+contract: Remove the `is_component` attribute, its allocation in `__init__`, and its write in `find`.
+instances: [sklearn/cluster/_hdbscan/_tree.pyx:330, sklearn/cluster/_hdbscan/_tree.pyx:337, sklearn/cluster/_hdbscan/_tree.pyx:355]
+
+### F5 — `remap_single_linkage_tree` docstring lies about `non_finite` type
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:364-365 documents `non_finite : ndarray — Boolean array of which entries in the raw data are non-finite`. The only caller (hdbscan.py:838) passes `non_finite=set(infinite_index + missing_index)` — a `set` of integer indices, not a boolean array. The loop body at line 388-389 (`for i, outlier in enumerate(non_finite): outlier_tree[i] = (outlier, ...)`) uses `outlier` as an index scalar, which is inconsistent with the documented boolean-mask interpretation.
+scenario: "Future maintainer reads the docstring, tries to reuse the function with a boolean mask (e.g. `np.isnan(X).any(axis=1)`) → the loop stores boolean values `True`/`False` into `left_node`, producing garbage outlier entries silently"
+contract: Rewrite the docstring to state `non_finite : set of int — Indices of raw-data rows that are non-finite`, matching what the caller passes.
+instances: single-instance
+
+### F6 — Inline comment lies about outlier label mapping
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:832-833 says "Samples with np.inf are mapped to -1 and those with np.nan are mapped to -2." The code immediately below (lines 842-843) actually assigns `_OUTLIER_ENCODING["infinite"]["label"]` (= -2) for inf and `_OUTLIER_ENCODING["missing"]["label"]` (= -3) for nan. The comment values (-1, -2) do not match the code (-2, -3).
+scenario: "Reader trusts the comment → uses `-1` to filter np.inf samples in downstream code and gets nothing, or `-2` to filter np.nan and misses them entirely"
+contract: Update the comment to "Samples with np.inf are mapped to -2 and those with np.nan are mapped to -3."
+instances: single-instance
+
+### F7 — Misspelled `mutual_reachibility_distance` local diverges from `reachability` naming
+severity: low
+evidence: sklearn/cluster/_hdbscan/_reachability.pyx:127, :144, :149, :182, :206, :209, :210 all use the identifier `mutual_reachibility_distance` while the file/function/module all consistently use "reachability" (see line 44 `mutual_reachability_graph`, file name `_reachability.pyx`).
+scenario: "Someone greps for `reachability` in the reachability code → misses the loop bodies that actually compute the reachability distance; a copy-paste of the variable name into new call-sites propagates the misspelling"
+contract: Rename the local to `mutual_reachability_distance` at every occurrence (7 lines above), matching the module and function names.
+instances: [sklearn/cluster/_hdbscan/_reachability.pyx:127, sklearn/cluster/_hdbscan/_reachability.pyx:144, sklearn/cluster/_hdbscan/_reachability.pyx:149, sklearn/cluster/_hdbscan/_reachability.pyx:182, sklearn/cluster/_hdbscan/_reachability.pyx:206, sklearn/cluster/_hdbscan/_reachability.pyx:209, sklearn/cluster/_hdbscan/_reachability.pyx:210]
+
+### F8 — Public docstrings render "single-linkage tree tree" and misspell "reahability"/"collecteion"
+severity: low
+evidence: The strings appear verbatim in user-visible NumPy-style docstrings that Sphinx will render: `single-linkage tree tree` at sklearn/cluster/_hdbscan/hdbscan.py:149, :220, :326, :361 and sklearn/cluster/_hdbscan/_linkage.pyx:234; `mutual-reahability graph` at sklearn/cluster/_hdbscan/hdbscan.py:102, :143 and sklearn/cluster/_hdbscan/_linkage.pyx:75, :137, :228; `collecteion of edges` at sklearn/cluster/_hdbscan/hdbscan.py:103, :144 and sklearn/cluster/_hdbscan/_linkage.pyx:76, :138, :229; `simbling` at sklearn/cluster/_hdbscan/_tree.pyx:503 and sklearn/cluster/tests/test_hdbscan.py:530; `smaler` at sklearn/cluster/_hdbscan/_tree.pyx:133.
+scenario: "Docs build publishes broken prose in official scikit-learn documentation → user searches Sphinx for `reachability` and misses these entries; documentation credibility hit"
+contract: Fix each misspelling to "reachability", "collection", "sibling", "smaller", and drop the doubled "tree" in "single-linkage tree tree" — a single sweep across the enumerated line-set is sufficient.
+instances: [sklearn/cluster/_hdbscan/hdbscan.py:102, sklearn/cluster/_hdbscan/hdbscan.py:103, sklearn/cluster/_hdbscan/hdbscan.py:143, sklearn/cluster/_hdbscan/hdbscan.py:144, sklearn/cluster/_hdbscan/hdbscan.py:149, sklearn/cluster/_hdbscan/hdbscan.py:220, sklearn/cluster/_hdbscan/hdbscan.py:326, sklearn/cluster/_hdbscan/hdbscan.py:361, sklearn/cluster/_hdbscan/_linkage.pyx:75, sklearn/cluster/_hdbscan/_linkage.pyx:76, sklearn/cluster/_hdbscan/_linkage.pyx:137, sklearn/cluster/_hdbscan/_linkage.pyx:138, sklearn/cluster/_hdbscan/_linkage.pyx:228, sklearn/cluster/_hdbscan/_linkage.pyx:229, sklearn/cluster/_hdbscan/_linkage.pyx:234, sklearn/cluster/_hdbscan/_tree.pyx:133, sklearn/cluster/_hdbscan/_tree.pyx:503, sklearn/cluster/tests/test_hdbscan.py:530]
+
+### F9 — `_weighted_cluster_center` pre-allocates a `mask` buffer it never uses
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:896 allocates `mask = np.empty((X.shape[0],), dtype=np.bool_)`. Inside the loop at line 908 the very first statement rebinds `mask = self.labels_ == idx`, discarding the pre-allocated buffer. `mask` is never read between allocation and rebinding.
+scenario: "Reader sees a pre-allocated typed buffer and assumes it's part of an in-place reuse optimization → wastes time proving no reuse exists; every fit with `store_centers` also allocates and immediately abandons the buffer"
+contract: Delete line 896 — the loop's `mask = self.labels_ == idx` already produces the correct array.
+instances: single-instance
+
+### F10 — `enumerate(tree)` with `_` while indexing `tree[i]` misleads the reader
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:370 uses `for i, _ in enumerate(tree):` and the loop body at lines 371-381 accesses `tree[i]["left_node"]`, `tree[i]["right_node"]`, and writes `tree[i]["left_node"] = ...`. The `_` implies "value unused", but each iteration re-fetches the same row that `enumerate` already produced.
+scenario: "Reader parses `for i, _ in enumerate(tree)` as an index-only walk and misses that the loop mutates `tree[i]` in place → refactoring to `for entry in tree` is tempted and silently breaks because structured-array element access is view-vs-copy dependent"
+contract: Replace with `for i in range(len(tree)):` — it accurately signals index-only iteration and matches the mutation intent.
+instances: single-instance

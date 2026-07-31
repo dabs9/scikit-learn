@@ -1,0 +1,68 @@
+# Revision required
+
+Your previous output failed the deterministic contract linter (violations listed below).
+Produce the FULL corrected findings document: fix ONLY the listed violations and keep every
+other byte of content verbatim. Do not add, drop, or renumber findings unless a violation
+explicitly requires it. Your final response text IS the corrected file — output only the
+findings document, nothing else.
+
+## Lint violations
+inverse.md F1: evidence has no file:line anchor (checked the evidence line and its continuation lines)
+inverse.md F1: scenario lacks trigger→consequence arrow
+inverse.md F2: scenario lacks trigger→consequence arrow
+
+## Your previous output (revise this)
+-----BEGIN PREVIOUS OUTPUT-----
+### F1 — Unsanctioned whitespace-only edits in Mean Shift documentation
+severity: low
+evidence:
+  - Plan of record (`/work/review-harness/runs/26385/PLAN.md`) scopes this PR to "Add `HDBSCAN` as a new estimator in `sklearn.cluster`" (line 4) plus three explicit novel Cython-side changes (lines 15–17): `cnp.*_t` → `*_t`, `*.shape[0]` → `len(*)`, and trimming unused Cython variables. Nothing in the plan sanctions edits to unrelated prose in the Mean Shift section of `doc/modules/clustering.rst`.
+  - Diff `hunks/doc_modules_clustering.rst.diff` at lines 22–26 (removes trailing whitespace on "called hill " and "estimated probability density."), lines 30–31 ("depends on a kernel used for density estimation. "), and lines 34–35 ("is small enough and is ") — all inside the Mean Shift section of `doc/modules/clustering.rst`, unrelated to HDBSCAN.
+scenario: "A reviewer scanning the `-5` half of the `doc/modules/clustering.rst` manifest entry (`+118/-5`) expects deletions tied to the HDBSCAN addition (e.g. the legitimate replacement of the external `HDBSCAN <https://hdbscan.readthedocs.io>` URL with `:class:`HDBSCAN`` at hunk line 165). Instead, 4 of the 5 removed lines are trailing-whitespace-only cleanups in an unrelated section, complicating the diff review and mixing style-cleanup into a feature PR."
+contract: Changes in inventory B must be accounted for by an item in inventory A (or the plan's own "novel changes" list). These edits touch a section of the file the plan does not enumerate.
+instances: [doc/modules/clustering.rst:402, doc/modules/clustering.rst:415, doc/modules/clustering.rst:422, doc/modules/clustering.rst:429]
+
+### F2 — Novel-change claim "Replaced `cnp.*_t` typing with `*_t` from `_typedefs.pxd`" not applied to `_tree.pyx`
+severity: low
+evidence:
+  - Plan of record `/work/review-harness/runs/26385/PLAN.md:15` explicitly lists this as one of the three novel changes included with the PR.
+  - Verified in the worktree: `sklearn/cluster/_hdbscan/_linkage.pyx:42`, `_reachability.pyx:40`, and `_tree.pxd:30` all cimport typedefs (`from ...utils._typedefs cimport ...`). But `sklearn/cluster/_hdbscan/_tree.pyx` contains 90 occurrences of `cnp.*_t` (grep count) and has no `_typedefs` cimport — the file uses `cnp.float64_t`/`cnp.intp_t` throughout (e.g., diff `hunks/sklearn_cluster__hdbscan__tree.pyx.diff:45-46, 63-73, 90`).
+scenario: "The plan announces a uniform Cython-typing modernization to `_typedefs.pxd` types. A reader auditing the merged tree expects the four HDBSCAN Cython files to share that convention. Because `_tree.pyx` retains the pre-modernization `cnp.*_t` typing, the 'novel change' description in the plan overstates what actually landed — leaving inconsistent typing conventions across sibling files in one module."
+contract: Every requirement/promise in the plan (inventory A) must have a corresponding implementing change (inventory B). The novel-change item at PLAN.md:15 has no implementing change touching `_tree.pyx`, and no other file in the manifest converts it.
+instances: [sklearn/cluster/_hdbscan/_tree.pyx:45, sklearn/cluster/_hdbscan/_tree.pyx:46, sklearn/cluster/_hdbscan/_tree.pyx:63, sklearn/cluster/_hdbscan/_tree.pyx:90]
+
+-----END PREVIOUS OUTPUT-----
+
+## Original task prompt
+# Role
+
+You are the inverse-conformance auditor: you check the plan against the change and the
+change against the plan, as inventories. Your final response text IS the inverse findings
+file — output only the findings document.
+
+# Inputs (absolute paths; your cwd is the PR-head worktree)
+
+- Plan of record: /work/review-harness/runs/26385/PLAN.md
+- Diff manifest: /work/review-harness/runs/26385/DIFF_MANIFEST.md
+- Worktree at PR head: /tmp/rh-wt-26385
+- Hunks: /tmp/rh-wt-26385/hunks/
+
+# Task
+
+1. Build inventory A: every requirement, promised deliverable, or stated behavior in the
+   plan of record (explicit checklist items AND commitments made in prose).
+2. Build inventory B: every actual change, from the manifest (all 100% of listed files).
+3. Emit findings for:
+   (a) requirements in A with NO implementing change in B (verify absence in the worktree
+       before claiming it — the implementation may live in an unchanged file);
+   (b) changes in B with NO sanctioning requirement in A (the plan's own "novel changes"
+       notes count as sanctioning);
+   (c) manifest files that no requirement and no other finding accounts for.
+4. Verify every claim in the tree. Cite the plan text or manifest line you relied on in the
+   evidence (plan citations still need a file:line anchor into the changed tree or manifest).
+
+# Output format
+
+Standard blocks (### F<N> — title / severity / evidence / scenario / contract /
+instances), numbered F1... If the inventories reconcile completely, output exactly:
+NO FINDINGS

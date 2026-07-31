@@ -1,0 +1,13 @@
+### F1 — `HDBSCAN.dbscan_clustering` accepts unvalidated caller-supplied parameters
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:923-969 — the public method `dbscan_clustering(self, cut_distance, min_cluster_size=5)` never calls `_validate_params()` and its two parameters are not listed in `_parameter_constraints` (lines 616-645). Values flow straight into the Cython `labelling_at_cut(self._single_linkage_tree_, cut_distance, min_cluster_size)` at line 960-962 where `cut_distance` is coerced to `cnp.float64_t` and `min_cluster_size` to `cnp.intp_t` with no bounds/type gate at the Python boundary.
+scenario: "caller invokes `clusterer.dbscan_clustering(cut_distance=-1.0, min_cluster_size=-5)` after fitting → in `_tree.pyx:419` the guard `cluster_size[cluster] < min_cluster_size` is vacuously false for every cluster, so every merged group is emitted as a real cluster label instead of noise — silently wrong output rather than a `ValueError`."
+contract: Both `cut_distance` and `min_cluster_size` must be validated (e.g., via an `Interval` constraint in `_parameter_constraints` and a call to `_validate_params()` at the start of `dbscan_clustering`) so out-of-range or wrong-type inputs raise `InvalidParameterError` before reaching Cython.
+instances: single-instance
+
+### F2 — Dense precomputed distance matrix only rejects NaN, silently accepts negative values and -inf
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:741-751 — for `metric="precomputed"` on a dense array the code calls `_validate_data(X, force_all_finite=False, dtype=np.float64)` then checks only `if np.isnan(X).any(): raise ValueError("np.nan values found in precomputed-dense")`. The comment at line 743-744 documents intent as "allowed to contain numpy.inf for missing distances", but there is no check for negative values or `-np.inf`. In `_hdbscan_brute` at line 241 the matrix is passed to `mutual_reachability_graph` unchanged, and in `_reachability.pyx:144-149` `max(core_i, core_j, distance_matrix[i,j])` propagates any `-inf`/negatives through the MST without complaint.
+scenario: "user passes a precomputed dense matrix containing `-np.inf` or negative pseudo-distances (e.g., from a similarity matrix mistakenly reused as distances) → passes validation, `mutual_reachability_graph` folds them in, and clustering silently returns nonsensical labels/probabilities instead of raising the expected input-validation error."
+contract: Dense precomputed matrices must be rejected when they contain negative values or `-np.inf`; only NaN and (per docs) `+np.inf` should be tolerated.
+instances: single-instance

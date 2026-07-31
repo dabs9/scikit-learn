@@ -1,0 +1,62 @@
+### F1 — `_OUTLIER_ENCODING` labels drift from hardcoded exclusion set (`-3` missing)
+severity: high
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:895 — `n_clusters = len(set(self.labels_) - {-1, -2})`; class docstring at 561-562 and 572-573 states the excluded outlier labels are `-1, -2, -3`; `_OUTLIER_ENCODING["missing"]["label"] = -3` at line 74.
+scenario: "user fits HDBSCAN with `store_centers='centroid'` on data containing `np.nan` rows → samples get label -3, `set(self.labels_) - {-1, -2}` still contains -3, `n_clusters` is inflated by one, the final `for idx in range(n_clusters)` iteration produces an empty `data`/`strength` slice and computes a bogus centroid (or raises)"
+contract: replace the hardcoded literal set with the labels sourced from `_OUTLIER_ENCODING` (e.g. `{-1} | {v["label"] for v in _OUTLIER_ENCODING.values()}`, mirroring `OUTLIER_SET` in the test file at test_hdbscan.py:37), so the single source of truth (`_OUTLIER_ENCODING`) governs every outlier-label check.
+instances: single-instance
+
+### F2 — `n_jobs` init default (4) contradicts docstring default (`None`)
+severity: medium
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:486-490 — docstring reads `n_jobs : int, default=None ... None means 1 unless in a joblib.parallel_backend context`; sklearn/cluster/_hdbscan/hdbscan.py:658 — `n_jobs=4` is the actual constructor default.
+scenario: "user reads docs and wraps `HDBSCAN().fit(X)` in a `joblib.parallel_backend('loky', n_jobs=8)` context expecting it to honor the backend as promised → the estimator silently uses `n_jobs=4` regardless because the actual default is hard-coded to 4, not `None`"
+contract: bind the constructor default to `None` (line 658) so the value matches the documented contract and the class conforms to the scikit-learn convention for `n_jobs`.
+instances: single-instance
+
+### F3 — Duplicate `births` allocation (dead first assignment)
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pyx:252 and :254 — the identical statement `births = np.full(largest_child + 1, np.nan, dtype=np.float64)` appears twice with no code in between that observes the first result.
+scenario: "any call to `_compute_stability` → the first `np.full` allocation is immediately overwritten by the second, wasting an allocation each call (visible on large trees) and signalling to readers that one of the two lines was meant to be something else"
+contract: delete line 252 so `births` is allocated exactly once.
+instances: single-instance
+
+### F4 — Comment claims label mapping (`inf → -1`, `nan → -2`) inconsistent with `_OUTLIER_ENCODING`
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:832-833 — comment reads "Samples with np.inf are mapped to -1 and those with np.nan are mapped to -2"; the code immediately below (lines 842-843) actually maps `inf → -2` and `nan → -3` via `_OUTLIER_ENCODING`.
+scenario: "future maintainer trusts the comment and adjusts downstream label handling to match `-1/-2` instead of `-2/-3` → introduces a semantic regression"
+contract: rewrite the comment to state the actual mapping (`inf → -2`, `nan → -3`) and reference `_OUTLIER_ENCODING` as the source of truth.
+instances: single-instance
+
+### F5 — `PyArray_SHAPE` extern re-declared instead of cimported from `_tree.pxd`
+severity: low
+evidence: sklearn/cluster/_hdbscan/_tree.pxd:48-49 declares `cdef extern from "numpy/arrayobject.h": intp_t * PyArray_SHAPE(cnp.PyArrayObject *)`; sklearn/cluster/_hdbscan/_linkage.pyx:44-45 declares the same extern locally rather than `cimport`ing it from the pxd (which is already used in `_linkage.pyx` for `HIERARCHY_t` on line 40).
+scenario: "the return type or argument type of the C helper is ever updated in `_tree.pxd` (e.g. to use `npy_intp *` explicitly) → `_linkage.pyx` keeps the stale declaration and the two compilation units disagree on the ABI"
+contract: remove the local `cdef extern` in `_linkage.pyx` and `cimport PyArray_SHAPE` from `_tree.pxd` so the extern is single-sourced.
+instances: [sklearn/cluster/_hdbscan/_linkage.pyx:44, sklearn/cluster/_hdbscan/_tree.pxd:48]
+
+### F6 — `_hdbscan_prims` docstring documents a nonexistent `copy` parameter
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:269-278 — signature has no `copy` parameter; sklearn/cluster/_hdbscan/hdbscan.py:313-318 — docstring still contains the `copy : bool, default=False ...` block copy-pasted from `_hdbscan_brute` (lines 207-212).
+scenario: "user reads the `_hdbscan_prims` docstring and calls it with `copy=True` → `TypeError: _hdbscan_prims() got an unexpected keyword argument 'copy'`, or (more commonly) reader is misled about the function's contract"
+contract: delete the `copy` parameter block from `_hdbscan_prims`'s docstring; the single source of truth for `copy` is `_hdbscan_brute` (and the public `HDBSCAN.copy`).
+instances: single-instance
+
+### F7 — `_hdbscan_brute` / `_hdbscan_prims` docstring defaults drift from actual signatures
+severity: low
+evidence: sklearn/cluster/_hdbscan/hdbscan.py:160-161 — actual defaults `min_samples=5, alpha=None`; docstring 179 and 183 say `min_samples : int, default=None` and `alpha : float, default=1.0`. Same drift in `_hdbscan_prims`: sklearn/cluster/_hdbscan/hdbscan.py:272 has `min_samples=5` while sklearn/cluster/_hdbscan/hdbscan.py:290 says `default=None`.
+scenario: "reader/maintainer takes the doc-stated defaults at face value and calls `_hdbscan_brute(X)` expecting `alpha=1.0` → gets `alpha=None`, which then produces a `TypeError` on the `distance_matrix /= alpha` line (241)"
+contract: reconcile each docstring `default=...` clause with the actual signature default, using the signature as the source of truth.
+instances: [sklearn/cluster/_hdbscan/hdbscan.py:161, sklearn/cluster/_hdbscan/hdbscan.py:179, sklearn/cluster/_hdbscan/hdbscan.py:183, sklearn/cluster/_hdbscan/hdbscan.py:272, sklearn/cluster/_hdbscan/hdbscan.py:290]
+
+### F8 — Test hardcodes stale algorithm names (`prims_kdtree`/`prims_balltree`) that drift from the current constraint set [out-of-theme]
+severity: medium
+evidence: sklearn/cluster/tests/test_hdbscan.py:282 — `hdb = HDBSCAN(metric="precomputed", algorithm=f"prims_{tree}tree")`; the `algorithm` `StrOptions` set at sklearn/cluster/_hdbscan/hdbscan.py:631-637 only allows `{"auto", "brute", "kdtree", "balltree"}`.
+scenario: "the test claims to verify that combining `metric='precomputed'` with a tree-based algorithm raises `ValueError` via the sparse-tree guard at hdbscan.py:786-791 → in practice `_validate_params` raises `InvalidParameterError` first because `prims_kdtree` is not in the allowed set, so the guard the test names is never exercised and would silently break without the test failing"
+contract: change the parametrization to use the actual allowed algorithm names (`kdtree`, `balltree`), so the test truly exercises the `precomputed` + tree-based guard.
+instances: single-instance
+
+### F9 — `plot_hdbscan.py` scale-invariance loop does not scale `X`, contradicting the paired DBSCAN loop
+severity: low
+evidence: examples/cluster/plot_hdbscan.py:87-89 — DBSCAN demo scales input as `dbs.fit(X * scale)`; examples/cluster/plot_hdbscan.py:106-110 — mirroring HDBSCAN demo calls `hdb.fit(X)` instead of `hdb.fit(X * scale)`, then labels the plot with the (unused) scale value.
+scenario: "reader executes the notebook expecting three visibly different clusterings at scales `(1, 0.5, 3)` demonstrating HDBSCAN's scale-invariance → sees three identical panels (all fit on unscaled X), and the pedagogical claim in surrounding prose is not actually demonstrated"
+contract: replace `hdb.fit(X)` with `hdb.fit(X * scale)` (and pass `X * scale` into `plot(...)`) to mirror the DBSCAN loop and single-source the scaling behavior across the two paired demos.
+instances: single-instance
